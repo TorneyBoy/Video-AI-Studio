@@ -1,0 +1,26 @@
+import {hasPendingWave} from './pending-wave';
+import {personalSession} from './api';
+import {ClientError,object} from './contracts';
+import {guardStudio,studioContext,studioHash} from './studio-state';
+import * as Forms from '../vendor/batch-form';
+import {TaskView} from './billing-state';
+export interface BatchAggregate {status:string;total:number;succeeded:number;attention:number;cancelled:number;finished:number;progress:number;counts:Record<string,number>}
+export interface BatchView {execution?:{active:number;batch_limit:number;note:string};id:string;project_id:string;name:string;state:string;revision:number;shared:Forms.Draft['shared'];parent_job_id:string|null;aggregate:BatchAggregate;items:Array<Forms.Item & {id:string;position:number;effective:Forms.Draft['shared'];job_id:string|null;status:string;failure_code:string|null;document_id?:string|null;revision_id?:string|null;revision_number?:number|null;task?:TaskView|null}>}
+export interface BatchQuote {id:string;batch_id:string;revision:number;item_count:number;unique_asset_count:number;expires_at:string;can_submit:boolean;status:string;reasons:string[];note:string;totals:Array<{currency:string;amount_micros:string}>;items:Array<{key:string;name:string;asset_count:number;analysis_counts:Record<string,number>;allocated_totals:Array<{currency:string;amount_micros:string}>}>;analysis:Array<{name:string;disposition:string;problem:string|null;job_id:string|null}>}
+export interface BatchCache {id:string;revision:number;savedHash:string;form:Forms.Draft}
+export interface BatchOperation {context:string;kind:'create'|'save'|'confirm';batchId:string;key:string;body:Record<string,unknown>}
+export interface BatchReceipt {found:boolean;can_abandon?:boolean;batch?:BatchView;result?:{batch_id:string};revision?:number;head_revision?:number;snapshot?:Forms.Draft}
+const CACHE='video-ai-studio.batch-draft.v1.',ACTIVE='video-ai-studio.batch-active.v1.',PENDING='video-ai-studio.batch-operation.v1.';
+export function formHash(form:Forms.Draft):string{return studioHash(Forms.body(form));}
+export function cacheDraft(row:BatchCache):void{guardStudio(studioContext());wx.setStorageSync(CACHE+studioContext()+':'+(row.id||'new'),row);wx.setStorageSync(ACTIVE+studioContext(),row.id||'new');}
+export function readBatchDraft(id?:string):BatchCache|null{const choice=id===undefined?wx.getStorageSync(ACTIVE+studioContext())||'new':id||'new';const row=object(wx.getStorageSync(CACHE+studioContext()+':'+choice));return typeof row.id==='string'&&Array.isArray(object(row.form).items)?row as unknown as BatchCache:null;}
+export function fromBatch(row:BatchView):BatchCache{const form:Forms.Draft={name:row.name,shared:row.shared,items:row.items.map(item=>({key:item.key,name:item.name,overrides:item.overrides}))};return{id:row.id,revision:row.revision,savedHash:formHash(form),form};}
+export function pendingBatch():BatchOperation|null{const row=object(wx.getStorageSync(PENDING+studioContext()));return row.context===studioContext()&&['create','save','confirm'].includes(String(row.kind))&&typeof row.key==='string'?row as unknown as BatchOperation:null;}
+export function batchOperation(kind:BatchOperation['kind'],batchId:string,body:Record<string,unknown>,quoteId=''):BatchOperation{return{context:studioContext(),kind,batchId,key:kind==='confirm'?'batch-confirm:'+quoteId:'batch-'+kind+':'+studioHash({body,time:Date.now(),random:Math.random()}),body};}
+function endpoint(row:BatchOperation):string{return row.kind==='create'?'/batches':'/batches/'+encodeURIComponent(row.batchId)+(row.kind==='save'?'/configuration':'/confirm');}
+export async function sendBatch<T>(row:BatchOperation,repeat=false):Promise<T>{guardStudio(row.context);const prior=pendingBatch();if(!prior&&!repeat&&hasPendingWave(row.context))throw new ClientError('batch_run_unconfirmed','请先在批次生成页面核对原提交');if(prior&&prior.key!==row.key)throw new ClientError('batch_unconfirmed','请先核对原批次提交');try{wx.setStorageSync(PENDING+row.context,row);}catch(_){throw new ClientError('batch_cache_unavailable','无法保存原提交记录，请检查设备存储');}
+ try{const result=await personalSession.request<T>(endpoint(row),'POST',row.body,row.key);guardStudio(row.context);return result;}
+ catch(error){if(!prior&&!repeat&&error instanceof ClientError&&error.status>=400&&error.status<500)wx.removeStorageSync(PENDING+row.context);throw error;}}
+export function acknowledgeBatch(row:BatchOperation):void{const saved=object(wx.getStorageSync(PENDING+row.context));if(saved.key===row.key)wx.removeStorageSync(PENDING+row.context);}
+export async function checkBatch(row:BatchOperation):Promise<BatchReceipt>{guardStudio(row.context);const path=row.kind==='create'?'/batches/requests/':row.kind==='save'?'/batches/'+encodeURIComponent(row.batchId)+'/configuration/requests/':'/batches/'+encodeURIComponent(row.batchId)+'/requests/';const query=row.kind==='save'?'?base_revision='+String(row.body.base_revision):row.kind==='confirm'?'?quote_id='+encodeURIComponent(String(row.body.quote_id)):'';const receipt=await personalSession.request<BatchReceipt>(path+encodeURIComponent(row.key)+query);guardStudio(row.context);return receipt;}
+export const batchStatus=(value:string):string=>({draft:'草稿',running:'处理中',succeeded:'计划已完成',partial_success:'部分计划完成',attention:'需要处理',failed:'未完成',queued:'排队中',cancelled:'已取消',blocked:'受策略限制',missing:'原任务不可用'}[value]||value);

@@ -1,0 +1,76 @@
+name: quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: video_ai_test
+          POSTGRES_USER: video_ai_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U video_ai_test -d video_ai_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://video_ai_test:test-only-password@127.0.0.1:5432/video_ai_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: python -m pip install -c requirements-dev.lock -e '.[dev,gateway,ice,fc,operations]'
+      - run: python scripts/quality_gate.py all
+        env:
+          TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
+      - run: npm ci --prefix miniprogram
+      - run: npm run typecheck --prefix miniprogram
+      - run: npm run test:studio --prefix miniprogram
+      - run: npm run test:reviews --prefix miniprogram
+      - run: npm run test:delivery --prefix miniprogram
+      - run: npm run test:billing --prefix miniprogram
+      - run: npm run test:preparation --prefix miniprogram
+      - run: npm run test:batches --prefix miniprogram
+      - run: npm run test:runs --prefix miniprogram
+      - run: npm run test:batch-delivery --prefix miniprogram
+      - run: npm run test:storyboards --prefix miniprogram
+      - run: npm run test:shot-matching --prefix miniprogram
+      - name: Assemble a review source candidate without deployment
+        run: python scripts/package_release.py build --label ci-review --output-directory "$RUNNER_TEMP/video-ai-source-review"
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f infra/docker-compose.yml config --quiet
+      - name: Validate explicit M2 migration/execution profiles without starting services
+        env:
+          CONTROL_IMAGE: sha256:0000000000000000000000000000000000000000000000000000000000000000
+          M2_RUNTIME_ENV: ${{ github.workspace }}/.env.m2.example
+          M2_CA_FILE: ${{ github.workspace }}/.env.m2.example
+          M2_PROVIDER_REGISTRY: ${{ github.workspace }}/config/providers.aliyun.m1.json
+          M2_CONTROL_DATA_VOLUME: source-contract-only-not-created
+        run: docker compose -f infra/m2.compose.yml --profile migration --profile execution --profile observation config --quiet
+
+  observability-rules:
+    runs-on: ubuntu-latest
+    env:
+      PROMETHEUS_IMAGE: prom/prometheus@sha256:87861b8cf91579109319ebc300f3f1060e6da9c05d6ae8ad15a20c879e84e32e
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate rules and alert behavior without network
+        run: |
+          docker pull "$PROMETHEUS_IMAGE"
+          docker run --rm --network none --memory 128m --cpus 0.5 --mount "type=bind,source=$GITHUB_WORKSPACE/infra/observability,target=/etc/prometheus,readonly" --workdir /etc/prometheus --entrypoint /bin/promtool "$PROMETHEUS_IMAGE" check rules video-ai-alerts.yml
+          docker run --rm --network none --memory 128m --cpus 0.5 --mount "type=bind,source=$GITHUB_WORKSPACE/infra/observability,target=/etc/prometheus,readonly" --workdir /etc/prometheus --entrypoint /bin/promtool "$PROMETHEUS_IMAGE" test rules alerts.test.yml
+          docker run --rm --network none --memory 128m --cpus 0.5 --mount "type=bind,source=$GITHUB_WORKSPACE/infra/observability,target=/etc/prometheus,readonly" --workdir /etc/prometheus --entrypoint /bin/promtool "$PROMETHEUS_IMAGE" check config --syntax-only prometheus.example.yml

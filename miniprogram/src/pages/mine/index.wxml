@@ -1,0 +1,4 @@
+<view class="page"><view class="eyebrow">MY WORKSPACE</view><view class="title">我的工作台</view><view class="intro">个人空间在手机和网页之间同步。</view>
+  <view class="card" wx:if="{{profile}}"><view class="card-title">{{profile.display_name}}</view><view class="muted">{{profile.login_name}}</view><view class="divider" /><button class="secondary" bindtap="logout" loading="{{busy}}" disabled="{{busy}}">退出当前账号</button></view>
+  <button class="primary" wx:else bindtap="login">登录个人空间</button><view class="status">{{status}}</view>
+</view>

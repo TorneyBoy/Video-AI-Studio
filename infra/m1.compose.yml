@@ -1,0 +1,89 @@
+# Private, single-tenant acceptance environment. Reach 8080 through SSH only.
+# Host networking lets the credential gateway use ECS IMDSv2 without changing
+# the instance metadata hop limit or exposing services on a Docker bridge.
+name: video-ai-m1
+x-control: &control
+  image: ${CONTROL_IMAGE:?Set a built control image tag or digest}
+  network_mode: host
+  env_file: ../.env.m1
+  extra_hosts: ["video-ai-gateway.internal:127.0.0.1"]
+  environment:
+    SSL_CERT_FILE: /run/video-ai/ca.pem
+  volumes:
+    - ../data/deployment/ca.pem:/run/video-ai/ca.pem:ro
+    - ../config/providers.aliyun.m1.json:/run/video-ai/providers.json:ro
+    - control_data:/app/data
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs: ["/tmp:size=32m,mode=1777"]
+  restart: unless-stopped
+  pids_limit: 128
+  mem_limit: 512m
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set a pinned PostgreSQL 16 image}
+    network_mode: host
+    env_file: ../.env.m1.postgres
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-c", "port=5434", "-c", "max_connections=40", "-c", "shared_buffers=128MB"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5434 -U video_ai -d video_ai"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+  api:
+    <<: *control
+    depends_on:
+      postgres: {condition: service_healthy}
+  worker:
+    <<: *control
+    command: ["python", "-m", "app.cli", "process-jobs", "--watch", "--interval", "3", "--limit", "1"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  gateway:
+    image: ${GATEWAY_IMAGE:?Set a built gateway image tag or digest}
+    network_mode: host
+    env_file: ../.env.gateway
+    command: ["uvicorn", "media_gateway.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8100", "--no-access-log", "--ssl-certfile", "/run/video-ai/gateway.pem", "--ssl-keyfile", "/run/video-ai/gateway.key"]
+    volumes:
+      - ../data/deployment/gateway.pem:/run/video-ai/gateway.pem:ro
+      - ../data/deployment/gateway.key:/run/video-ai/gateway.key:ro
+      - gateway_data:/app/data
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    restart: unless-stopped
+    pids_limit: 128
+    mem_limit: 768m
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+  acceptance-edge:
+    image: ${CONTROL_IMAGE:?Set a built control image tag or digest}
+    network_mode: host
+    env_file: ../.env.m1.edge
+    command: ["python", "/run/video-ai/acceptance_edge.py"]
+    volumes: ["../scripts/acceptance_edge.py:/run/video-ai/acceptance_edge.py:ro"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    restart: unless-stopped
+    pids_limit: 64
+    mem_limit: 128m
+
+volumes:
+  postgres_data:
+  control_data:
+  gateway_data:

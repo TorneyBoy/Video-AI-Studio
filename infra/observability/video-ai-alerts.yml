@@ -1,0 +1,32 @@
+groups:
+  - name: video-ai-basics
+    rules:
+      - alert: VideoAIControlUnavailable
+        expr: up{job="video-ai-control"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: video-ai-studio
+        annotations:
+          summary: Control API metrics scrape is unavailable
+      - alert: VideoAIOperationalAttention
+        # DB-backed conditions are repeated by replicas; max deduplicates them.
+        expr: max by (code, severity) (video_ai_alert_active{job="video-ai-control"} == 1)
+        for: 2m
+        labels:
+          service: video-ai-studio
+        annotations:
+          summary: Inspect the original task and operational report
+      - alert: VideoAIHTTPFailures
+        # Provisional operator threshold, not a product SLA. Ignore probes.
+        expr: >-
+          (sum(rate(video_ai_http_requests_total{job="video-ai-control",status=~"5..",route!~"/metrics|/healthz|/health|/readyz"}[5m]))
+          / clamp_min(sum(rate(video_ai_http_requests_total{job="video-ai-control",route!~"/metrics|/healthz|/health|/readyz"}[5m])), 0.001) > 0.05)
+          and
+          (sum(increase(video_ai_http_requests_total{job="video-ai-control",route!~"/metrics|/healthz|/health|/readyz"}[5m])) >= 20)
+        for: 5m
+        labels:
+          severity: warning
+          service: video-ai-studio
+        annotations:
+          summary: Control API has repeated server errors

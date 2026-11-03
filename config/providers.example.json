@@ -1,0 +1,259 @@
+{
+  "providers": [
+    {
+      "name": "hosted-video-editing",
+      "kind": "http",
+      "endpoint": "https://video-gateway.example.com",
+      "path": "/v1/video/edit",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 60,
+      "max_poll_attempts": 20,
+      "timeout_seconds": 120,
+      "health_path": "/health",
+      "headers_env": {
+        "Authorization": "VIDEO_EDITING_API_KEY"
+      },
+      "callback_secret_env": "VIDEO_EDITING_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "video_editing",
+          "input_types": ["json", "remote_video", "remote_image", "remote_audio"],
+          "output_types": ["video"],
+          "quality_score": 0.9,
+          "cost": {
+            "per_minute": 0.12,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        },
+        {
+          "name": "media_analysis",
+          "input_types": ["json", "remote_video", "remote_image"],
+          "output_types": ["json"],
+          "quality_score": 0.9,
+          "cost": {
+            "per_request": 0.01,
+            "currency": "USD",
+            "billing_unit": "request"
+          },
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "hosted-video-editing-v1",
+        "version": "2026-01",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "hosted-video-generation",
+      "kind": "http",
+      "endpoint": "https://video-generation-gateway.example.com",
+      "path": "/v1/video/generate",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 5,
+      "poll_timeout_seconds": 180,
+      "max_poll_attempts": 36,
+      "timeout_seconds": 180,
+      "health_path": "/health",
+      "headers_env": {
+        "Authorization": "VIDEO_GENERATION_API_KEY"
+      },
+      "callback_secret_env": "VIDEO_GENERATION_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": ["json", "remote_image", "remote_video"],
+          "output_types": ["video"],
+          "quality_score": 0.88,
+          "cost": {
+            "per_minute": 0.35,
+            "currency": "USD",
+            "billing_unit": "second"
+          },
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "hosted-video-generation-v1",
+        "version": "2026-01",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "hosted-voice",
+      "kind": "http",
+      "endpoint": "https://voice-gateway.example.com",
+      "path": "/v1/audio/generate",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 2,
+      "poll_timeout_seconds": 60,
+      "max_poll_attempts": 30,
+      "timeout_seconds": 120,
+      "health_path": "/health",
+      "headers_env": {
+        "Authorization": "VOICE_API_KEY"
+      },
+      "callback_secret_env": "VOICE_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "voice_tts",
+          "input_types": ["json", "text"],
+          "output_types": ["audio"],
+          "quality_score": 0.9,
+          "cost": {
+            "per_request": 0.02,
+            "currency": "USD",
+            "billing_unit": "request"
+          },
+          "commercial_allowed": true
+        },
+        {
+          "name": "voice_clone",
+          "input_types": ["json", "remote_audio"],
+          "output_types": ["audio"],
+          "quality_score": 0.86,
+          "cost": {
+            "per_request": 0.08,
+            "currency": "USD",
+            "billing_unit": "request"
+          },
+          "commercial_allowed": true
+        },
+        {
+          "name": "voice_conversion",
+          "input_types": ["json", "remote_audio"],
+          "output_types": ["audio"],
+          "quality_score": 0.84,
+          "cost": {
+            "per_minute": 0.06,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "hosted-voice-v1",
+        "version": "2026-01",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "hosted-avatar-and-motion",
+      "kind": "http",
+      "endpoint": "https://avatar-gateway.example.com",
+      "path": "/v1/avatar/transform",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 4,
+      "poll_timeout_seconds": 180,
+      "max_poll_attempts": 45,
+      "timeout_seconds": 180,
+      "health_path": "/health",
+      "headers_env": {
+        "Authorization": "AVATAR_API_KEY"
+      },
+      "callback_secret_env": "AVATAR_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "motion_transfer",
+          "input_types": ["json", "remote_video", "remote_image"],
+          "output_types": ["video"],
+          "quality_score": 0.85,
+          "cost": {
+            "per_minute": 0.5,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        },
+        {
+          "name": "face_transform",
+          "input_types": ["json", "remote_video", "remote_image"],
+          "output_types": ["video"],
+          "quality_score": 0.82,
+          "cost": {
+            "per_minute": 0.4,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        },
+        {
+          "name": "lip_sync",
+          "input_types": ["json", "remote_video", "remote_audio"],
+          "output_types": ["video"],
+          "quality_score": 0.84,
+          "cost": {
+            "per_minute": 0.3,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "hosted-avatar-v1",
+        "version": "2026-01",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "hosted-enhancement",
+      "kind": "http",
+      "endpoint": "https://enhancement-gateway.example.com",
+      "path": "/v1/video/enhance",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 5,
+      "poll_timeout_seconds": 600,
+      "max_poll_attempts": 60,
+      "timeout_seconds": 180,
+      "health_path": "/health",
+      "headers_env": {
+        "Authorization": "ENHANCEMENT_API_KEY"
+      },
+      "callback_secret_env": "ENHANCEMENT_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "enhancement",
+          "input_types": ["json", "remote_video", "remote_audio", "remote_image"],
+          "output_types": ["video", "audio", "image"],
+          "quality_score": 0.87,
+          "cost": {
+            "per_minute": 0.2,
+            "currency": "USD",
+            "billing_unit": "minute"
+          },
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "hosted-enhancement-v1",
+        "version": "2026-01",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    }
+  ]
+}

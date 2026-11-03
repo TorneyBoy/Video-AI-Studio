@@ -1,0 +1,10 @@
+<view class="page">
+  <view class="eyebrow">CREATE</view><view class="title">你的创作工作台</view><view class="intro">从一个项目开始，让素材、剪辑计划和成片保持在一起。</view>
+  <view class="card" wx:if="{{!profile}}"><view class="card-title">连接个人空间</view><view class="muted">登录后继续网页上的项目。</view><button class="primary" bindtap="login">登录或创建账号</button></view>
+  <block wx:else>
+    <view class="card"><view class="card-title">新建项目</view><input class="input" value="{{newProjectName}}" maxlength="200" bindinput="nameInput" placeholder="给这次创作起个名字" /><button class="primary" bindtap="createProject" loading="{{creating}}" disabled="{{creating || !newProjectName}}">创建项目</button></view>
+    <view class="label">最近项目</view><view class="muted" wx:if="{{!projects.length &amp;&amp; !loading}}">还没有项目，先创建一个。</view>
+    <view class="card" wx:for="{{projects}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseProject"><view class="row"><view class="card-title">{{item.name}}</view><text class="pill" wx:if="{{item.id === selectedProjectId}}">当前项目</text></view><view class="muted">{{item.description || '个人创作项目'}}</view></view>
+    <view class="card" wx:if="{{selectedProjectId}}"><view class="card-title">继续制作</view><button class="primary" bindtap="openAssets">选择项目素材</button><button class="secondary" bindtap="openStudio">模板剪辑与版本编辑</button><button class="secondary" bindtap="openStoryboards">参考创作与分镜</button><button class="secondary" bindtap="openBatches">批量制作与批次草稿</button><button class="secondary" bindtap="openWorks">查看已有成片</button><button class="secondary" bindtap="openBilling">费用与任务恢复</button></view>
+  </block><view class="status">{{status}}</view>
+</view>

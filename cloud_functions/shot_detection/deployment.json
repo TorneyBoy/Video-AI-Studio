@@ -1,0 +1,28 @@
+{
+  "status": "deployed_not_verified",
+  "account_id": "1253063092481585",
+  "code_package_sha256": "cfee7b488d67a0d13284124465d2a5f4f49380e349fff8a0460a6ef35b1674ba",
+  "function_name": "video-ai-shot-analysis",
+  "region": "cn-beijing",
+  "runtime": "python3.12",
+  "handler": "index.handler",
+  "cpu": 1,
+  "memory_size_mb": 1024,
+  "disk_size_mb": 512,
+  "timeout_seconds": 180,
+  "instance_concurrency": 1,
+  "minimum_instances": 0,
+  "maximum_instances": 1,
+  "function_execution_role": null,
+  "http_triggers": [],
+  "async": {
+    "asyncTask": true,
+    "maxAsyncRetryAttempts": 0,
+    "maxAsyncEventAgeInSeconds": 300
+  },
+  "environment": {
+    "PROJECT_OSS_HOST": "video-ai-huayuan-cn-beijing.oss-cn-beijing.aliyuncs.com"
+  },
+  "trial": {"max_invocations": 6, "max_video_seconds": 30, "max_source_bytes": 104857600},
+  "billing": {"mode": "pay_as_you_go", "resource_packages": false, "provisioned_instances": false}
+}

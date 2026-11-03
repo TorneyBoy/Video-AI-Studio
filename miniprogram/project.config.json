@@ -1,0 +1,8 @@
+{
+  "projectname": "video-ai-studio",
+  "description": "Video AI Studio 个人创作工作台",
+  "miniprogramRoot": "src/",
+  "compileType": "miniprogram",
+  "appid": "",
+  "setting": {"es6": true, "useCompilerPlugins": ["typescript"], "minified": true}
+}

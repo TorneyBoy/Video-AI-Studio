@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="个人视频创作与批量制作工作台">
+  <title>Video AI Studio · 个人工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">✦</span><span>Video AI<span class="brand-muted"> / Studio</span></span></div>
+    <div class="workspace-switcher"><span class="status-dot"></span><span id="workspaceName">正在连接个人空间</span></div>
+    <nav class="nav-list" aria-label="主导航">
+      <a class="nav-item active" href="#projects"><span>▦</span> 项目总览</a>
+      <a class="nav-item" href="#studio"><span>✦</span> 开始创作</a>
+      <a class="nav-item" href="#materials"><span>◇</span> 素材库 <span class="nav-count" id="navAssetCount">—</span></a>
+      <a class="nav-item" href="#works"><span>▷</span> 作品</a>
+      <a class="nav-item" href="#storyboards" id="openStoryboardsBtn"><span>▥</span> 参考创作</a><a class="nav-item" href="#batches" id="openBatchesBtn"><span>▤</span> 批量制作</a><a class="nav-item" href="#billing" id="openBillingBtn"><span>◈</span> 费用与恢复</a>
+      <a class="nav-item" href="#timeline"><span>◷</span> 任务队列</a>
+    </nav>
+    <div class="sidebar-bottom" id="account">
+      <a class="nav-item" href="/login" id="manageAccountLink" hidden><span>⚙</span> 账号与登录</a>
+      <div class="user-card"><div class="avatar" id="accountAvatar">我</div><div><strong id="accountName">尚未连接</strong><span id="accountRole">等待身份确认</span></div></div>
+    </div>
+  </aside>
+  <main class="main-content">
+    <header class="topbar"><div class="breadcrumbs"><span>个人空间</span><b>/</b><strong id="currentProjectName">项目总览</strong></div><button class="secondary-btn" id="refreshAllBtn" type="button">同步工作台</button></header>
+    <section class="page-head" id="projects"><div><p class="eyebrow" id="todayLabel">PERSONAL WORKSPACE</p><h1>项目总览</h1><p class="subtitle">从素材到成片，在同一个工作台继续制作。</p></div><button class="primary-btn" id="newProjectBtn" type="button"><span>＋</span> 新建项目</button></section>
+    <div class="workspace-notice" id="workspaceNotice" role="status" aria-live="polite">正在连接工作台…</div>
+    <section class="project-create-panel panel" id="newProjectPanel" hidden aria-labelledby="newProjectTitle">
+      <h2 id="newProjectTitle">新建项目</h2><form id="newProjectForm" method="post" action="/api/v1/projects"><label for="projectNameInput">项目名称</label><input id="projectNameInput" name="name" maxlength="200" required placeholder="给这次创作起个名字"><div class="render-actions"><button class="primary-btn" id="confirmNewProjectBtn" type="submit">创建项目</button><button class="secondary-btn" id="cancelNewProjectBtn" type="button">取消</button></div></form>
+    </section>
+    <section class="overview-grid" aria-label="工作台概览">
+      <article class="stat-card"><div class="stat-top"><span>个人项目</span><span class="stat-icon green">▦</span></div><div class="stat-value" id="projectCount">—</div><div class="stat-foot">已加载的项目</div></article>
+      <article class="stat-card"><div class="stat-top"><span>项目待处理任务</span><span class="stat-icon yellow">◷</span></div><div class="stat-value" id="activeJobCount">—</div><div class="stat-foot">当前项目的排队与处理中任务</div></article>
+      <article class="stat-card"><div class="stat-top"><span>项目视频记录</span><span class="stat-icon blue">▷</span></div><div class="stat-value" id="renderCount">—</div><div class="stat-foot">当前项目已生成的视频</div></article>
+    </section>
+    <section class="section-block" id="projectList"><div class="section-heading"><div><h2>我的项目</h2><p>选择项目后，素材、任务和作品会一起切换。</p></div><label class="project-filter">筛选状态 <select id="projectStatusFilter"><option value="all">全部项目</option><option value="active">制作中</option><option value="review">待审核</option><option value="completed">已完成</option><option value="archived">已归档</option></select></label></div>
+      <div class="project-table"><div class="table-row table-head"><span>项目名称</span><span>状态</span><span>最后编辑</span><span>制作入口</span><span></span></div><div class="empty-state">正在加载项目…</div></div>
+      <button class="text-btn" id="viewAllBtn" type="button">刷新项目列表 <span>→</span></button>
+    </section>
+    <div class="lower-grid">
+      <section id="storyboards" class="panel"><section id="storyboardPanel" hidden aria-label="参考创作与分镜"></section><section id="shotMatchingPanel" hidden aria-label="镜头素材与补拍"></section><p id="storyboardIntro">选择项目后，点击“参考创作”查看参考范围与分镜方案。</p></section><section id="batches" class="panel batch-panel"><section id="batchPanel" hidden aria-label="批量制作"></section><section id="batchRunsPanel" hidden aria-label="批次生成与恢复"></section><section id="batchDeliveryPanel" hidden aria-label="本轮审核与领取"></section><p id="batchIntro">批量配置并生成独立剪辑计划，请点击左侧“批量制作”。</p></section><section id="billing" class="panel"><section id="billingPanel" hidden aria-label="费用与任务恢复"></section><p id="billingIntro">查看项目预算、费用记录与任务恢复，请点击左侧“费用与恢复”。</p></section><section class="panel" id="works"><div class="section-heading compact"><div><h2>项目作品</h2><p>播放、下载或继续处理已有的视频。</p></div></div><div id="workCenterTools" class="editor-toolbar"></div><div id="workList" class="work-list"><div class="empty-state">选择项目后查看作品。</div></div><button id="moreWorksBtn" type="button" class="small-action" hidden>加载更多作品</button><section id="comparisonPanel" class="subtitle-editor" hidden aria-label="版本比较"></section></section>
+      <section class="panel timeline-panel" id="timeline"><div class="section-heading compact"><div><h2>任务进度</h2><p>查看实际进度，继续未完成的任务。</p></div><span class="live-label"><i></i> 待同步</span></div><div class="timeline"><div class="empty-state">选择项目后查看任务。</div></div><div class="job-detail" id="jobDetail" hidden></div><button class="text-btn" id="timelineBtn" type="button">刷新任务 <span>→</span></button></section>
+    </div>
+    <section id="materials">
+      <div class="upload-strip" id="upload"><div class="upload-copy"><div class="upload-icon">↑</div><div><h3>添加素材到项目</h3><p>选择视频、图片或音频，上传状态会显示在下方。</p></div></div><div class="upload-actions"><label class="secondary-btn" for="fileInput">选择文件<input id="fileInput" type="file" multiple accept="image/*,video/*,audio/*" hidden></label><label class="upload-analysis-toggle"><input id="analyzeUploads" type="checkbox" checked> 上传后提示分析报价</label></div></div>
+      <button id="analysisQuoteBtn" class="secondary-btn" type="button">所选素材 · 分析报价 / 核对原提交</button><section id="preparationPanel" class="subtitle-editor" hidden aria-label="分析与计划综合报价"></section>
+      <div id="uploadQueue" class="upload-queue" aria-live="polite"></div>
+      <details class="advanced-material"><summary>已有对象地址</summary><p class="muted">登记已经存入本工作空间的素材；普通文件请使用上传。</p><div class="remote-uri-form"><input id="remoteAssetUri" type="url" placeholder="项目素材的对象地址" aria-label="已有素材对象地址"><button class="secondary-btn" id="registerRemoteAssetBtn" type="button">登记素材</button></div></details>
+    </section>
+        <section class="studio-flow" id="studio" aria-label="自动成片工作台">
+          <div class="flow-header">
+            <div><p class="eyebrow">CREATE PIPELINE</p><h2>自动成片工作台</h2><p>选择素材和风格模板，生成可审阅的剪辑计划，再渲染预览或高清成片。</p></div>
+            <div class="flow-steps" aria-label="制作步骤"><span class="flow-step active" data-flow-step="assets"><b>1</b>素材</span><i></i><span class="flow-step" data-flow-step="template"><b>2</b>模板</span><i></i><span class="flow-step" data-flow-step="plan"><b>3</b>计划</span><i></i><span class="flow-step" data-flow-step="render"><b>4</b>成片</span></div>
+          </div>
+          <div class="studio-grid">
+            <section class="studio-panel assets-panel" aria-labelledby="assetPanelTitle">
+              <div class="studio-panel-heading"><div><h3 id="assetPanelTitle">1. 选择素材</h3><small id="assetSummary">尚未加载素材</small></div><button class="small-action" id="refreshWorkspaceBtn" type="button">刷新</button></div>
+              <form id="assetSearchForm" class="asset-search"><input id="assetSearch" aria-label="搜索素材名称" placeholder="搜索名称"><input id="assetTagSearch" aria-label="筛选标签" placeholder="标签"><select id="assetKindFilter" aria-label="素材类型"><option value="">所有类型</option><option value="video">视频</option><option value="image">图片</option><option value="audio">音频</option></select><button class="small-action" type="submit">筛选</button></form>
+              <div class="asset-list" id="assetList"><div class="empty-state">选择一个项目后，素材会显示在这里。</div></div>
+              <button class="small-action" type="button" id="editAssetLabelsBtn">整理选中素材</button>
+              <form id="assetLabelsForm" class="asset-labels-form" hidden><label id="assetRenameLabel">素材名称<input id="assetRename" maxlength="200"></label><label><span id="assetTagsLabel">标签（逗号分隔）</span><input id="assetTags" maxlength="1000"></label><label id="assetNoteLabel">备注<textarea id="assetNote" maxlength="2000"></textarea></label><button class="small-action" type="submit" id="saveAssetLabelsBtn">保存</button><button class="small-action" type="button" id="cancelAssetLabelsBtn">取消</button><small id="assetLabelsStatus" role="status"></small></form>
+              <button class="secondary-btn studio-upload-btn" type="button" id="studioUploadBtn">＋ 添加素材</button>
+            </section>
+            <section class="studio-panel template-panel" aria-labelledby="templatePanelTitle">
+              <div class="studio-panel-heading"><div><h3 id="templatePanelTitle">2. 选择风格模板</h3><small id="templateSummary">选择一个模板开始</small></div><span class="selection-badge" id="templateBadge">未选择</span></div>
+              <div class="studio-template-grid" id="studioTemplateGrid"><div class="empty-state">正在加载模板…</div></div>
+              <div class="plan-settings"><label>目标时长（秒，空白沿用模板）<input id="planTargetDuration" type="number" min="0.1" max="600" step="0.1" placeholder="按模板与可用素材"></label><label>画幅<select id="planAspectRatio"><option value="9:16">竖屏 9:16</option><option value="16:9">横屏 16:9</option><option value="1:1">方形 1:1</option></select></label></div>
+              <div class="plan-actions"><button class="primary-btn" id="createPlanBtn" type="button" disabled>生成剪辑计划 <span>→</span></button></div>
+            </section>
+            <section class="studio-panel plan-panel" aria-labelledby="planPanelTitle">
+              <div class="studio-panel-heading"><div><h3 id="planPanelTitle">3. 审阅剪辑计划</h3><small id="planSummary">等待生成计划</small></div><span class="selection-badge muted-badge" id="planBadge">未生成</span></div>
+              <div class="plan-result" id="planResult"><div class="empty-state">计划生成后会展示入选镜头和质量提示。</div></div>
+              <div class="pending-operation" id="pendingOperationPanel" hidden role="status"><p id="pendingOperationMessage"></p><button id="checkPendingOperationBtn" class="small-action" type="button">核对原提交</button><button id="repeatPendingOperationBtn" class="small-action" type="button">继续原提交</button></div>
+              <section id="planEditor" class="plan-editor" hidden aria-label="编辑剪辑计划">
+                <div class="editor-heading"><strong id="editorVersion"></strong><button id="refreshEditorBtn" class="small-action" type="button">载入当前版</button></div>
+                <p id="editorNotice" class="editor-notice" role="status"></p><div id="editorDraftPanel" class="editor-draft" hidden><p id="editorDraftLabel"></p><button id="reapplyEditorDraftBtn" class="small-action" type="button">审阅新版后重新应用修改</button><button id="discardEditorDraftBtn" class="small-action" type="button">放弃未保存修改</button></div>
+                <div class="editor-toolbar"><button id="replanUnlockedBtn" class="small-action" type="button">重算未锁定镜头</button><button id="addEditorSourcesBtn" class="small-action" type="button">将所选素材加入本版本</button><button id="undoEditorBtn" class="small-action" type="button">撤销上次修改</button></div>
+                <p id="editorTiming" class="editor-notice"></p><div id="editorTrackBands" class="editor-track-bands" aria-label="时间线轨道"></div>
+                <section id="preciseClipPanel" class="precise-clip-panel" hidden aria-label="片段精细编辑"><strong id="preciseClipTitle"></strong><p id="preciseClipBounds" class="muted"></p><p class="muted">点击片段条选择。裁切、分割和顺序调整按帧对齐；主视频顺接，其他轨道保持原时间点，超出新时长时会拒绝保存。</p><div class="clip-inputs"><label>源起点（秒）<input id="preciseSourceStart" inputmode="decimal"></label><label>源终点（秒）<input id="preciseSourceEnd" inputmode="decimal"></label></div><button type="button" id="trimPreciseBtn" class="small-action">裁切并顺接</button><div class="clip-inputs"><label>分割偏移（从片段开头算起，秒）<input id="preciseSplitOffset" inputmode="decimal"></label><button type="button" id="splitPreciseBtn" class="small-action">分割片段</button></div><div class="clip-inputs"><label>原声音量倍数（0静音，1原音，最多4）<input id="preciseVolume" inputmode="decimal"></label><button type="button" id="savePreciseVolumeBtn" class="small-action">保存原声音量</button></div><div class="clip-inputs"><label>画面适配<select id="preciseFit"><option value="contain">完整显示</option><option value="cover">居中填满裁切</option><option value="stretch">拉伸填满</option></select></label><button id="savePreciseFitBtn" type="button" class="small-action">保存适配</button></div><div class="clip-inputs"><label>本片段入场转场<select id="preciseTransition"><option value="none">无转场（硬切）</option><option value="fade">淡化</option><option value="dissolve">溶解</option><option value="wipeleft">左擦除</option><option value="wiperight">右擦除</option><option value="slideleft">左滑动</option><option value="slideright">右滑动</option></select></label><label>转场时长（秒）<input id="preciseTransitionDuration" inputmode="decimal"></label><button id="savePreciseTransitionBtn" type="button" class="small-action">保存转场</button></div><p class="muted">转场与前片段重叠，成片随之缩短；首片段不能添加入场转场。固定时间轨道需保持在新时长内。</p><div class="editor-toolbar"><button type="button" id="movePreciseUpBtn" class="small-action">片段前移</button><button type="button" id="movePreciseDownBtn" class="small-action">片段后移</button><button type="button" id="deletePreciseBtn" class="small-action">删除片段并顺接</button></div></section>
+                <div id="editorShots"></div>
+                <section id="subtitleEditor" class="subtitle-editor" aria-label="字幕编辑"><div class="editor-heading"><strong>字幕与原文</strong><div class="editor-toolbar"><button type="button" id="importTranscriptBtn" class="small-action">导入已有识别</button><button type="button" id="newSubtitleBtn" class="small-action">手动添加字幕</button></div></div><p class="muted">导入不重新识别，不覆盖已有修订。随源字幕会跟随视频裁切和重排；固定时间字幕保留成片时间点。</p><div id="subtitleCueList"></div>
+                  <form id="subtitleForm" hidden><div class="editor-heading"><strong id="subtitleFormTitle"></strong><button type="button" id="closeSubtitleFormBtn" class="small-action">收起编辑</button></div><label>字幕文字<textarea id="subtitleText" maxlength="20000" rows="3"></textarea></label><div class="clip-inputs"><label>字幕起点（秒）<input id="subtitleStart" inputmode="decimal"></label><label>字幕终点（秒）<input id="subtitleEnd" inputmode="decimal"></label></div><div class="clip-inputs"><label>字幕时间方式<select id="subtitleAnchorMode"><option value="keep">保持原关联（仅修改文字和样式）</option><option value="absolute">固定成片时间</option><option value="clip">跟随单个视频片段</option></select></label><label>关联视频片段<select id="subtitleAnchorClip"></select></label></div><div class="clip-inputs"><label>字幕字号（12–160）<input id="subtitleFontSize" inputmode="numeric"></label><label>字幕颜色（white、black、red或#RRGGBB）<input id="subtitleColor"></label><label>字幕横向位置（像素）<input id="subtitleX" inputmode="decimal"></label><label>字幕纵向位置（像素）<input id="subtitleY" inputmode="decimal"></label></div><div id="subtitleStylePreview" class="subtitle-style-preview"></div><small class="muted">样式示意；实际画面以媒体预览为准。导出文本文件仅含文字和时间。</small><div class="editor-toolbar"><button id="saveSubtitleBtn" type="submit" class="small-action">保存这句字幕</button><button id="copySubtitleAsNewBtn" type="button" class="small-action" hidden>将保留文字转为新增字幕</button></div></form>
+                  <details id="subtitleOriginalDetails"><summary>查看当前版本保存的 ASR 原文</summary><div id="subtitleOriginalList"></div><button id="moreSubtitleOriginalsBtn" type="button" class="small-action" hidden>加载更多原文</button></details><div class="editor-toolbar"><button type="button" id="exportSrtBtn" class="small-action">导出当前版 SRT</button><button type="button" id="exportVttBtn" class="small-action">导出当前版 VTT</button></div>
+                </section>
+                <section id="layerEditor" class="subtitle-editor" aria-label="音轨和画面叠加">
+                  <div class="editor-heading"><strong>音轨和画面叠加</strong><div class="editor-toolbar"><button id="newAudioLayerBtn" type="button" class="small-action">添加音轨片段</button><button id="newOverlayLayerBtn" type="button" class="small-action">添加画面叠加</button></div></div>
+                  <p class="muted">先在素材库选择素材并点击“加入本版本”。同轨片段不能重叠；多轨可混合。叠加画面不带声音，可另加音轨。</p><p id="advancedRenderNotice" class="editor-notice" role="status"></p><div id="layerTrackList"></div>
+                  <form id="layerForm" hidden><strong id="layerFormTitle"></strong><div class="clip-inputs"><label>轨道名称（修改会移动片段）<input id="layerTrackName" maxlength="120"></label><label>本版本素材<select id="layerAsset"></select></label></div><div class="clip-inputs"><label>成片起点（秒）<input id="layerStart" inputmode="decimal"></label><label>成片终点（秒）<input id="layerEnd" inputmode="decimal"></label><label>素材起点（图片填0，秒）<input id="layerSourceStart" inputmode="decimal"></label></div>
+                    <div id="audioLayerFields"><div class="clip-inputs"><label>音量倍数（0–4）<input id="layerVolume" inputmode="decimal"></label><label>用途<select id="layerAudioRole"><option value="music">配乐</option><option value="voice">旁白</option><option value="other">其他</option></select></label><label>淡入（秒）<input id="layerFadeIn" inputmode="decimal"></label><label>淡出（秒）<input id="layerFadeOut" inputmode="decimal"></label></div></div>
+                    <div id="overlayLayerFields"><div class="clip-inputs"><label>横向位置（像素）<input id="layerX" inputmode="decimal"></label><label>纵向位置（像素）<input id="layerY" inputmode="decimal"></label><label>宽度（像素）<input id="layerWidth" inputmode="numeric"></label><label>高度（像素）<input id="layerHeight" inputmode="numeric"></label><label>透明度（0–1）<input id="layerOpacity" inputmode="decimal"></label><label>画面适配<select id="layerFit"><option value="contain">完整显示</option><option value="cover">居中填满裁切</option><option value="stretch">拉伸填满</option></select></label></div></div>
+                    <div class="editor-toolbar"><button id="saveLayerBtn" type="submit" class="small-action">保存片段</button><button id="copyLayerAsNewBtn" type="button" class="small-action" hidden>将保留参数转为新增片段</button><button id="closeLayerFormBtn" type="button" class="small-action">收起编辑</button></div>
+                  </form>
+                </section>
+                <section id="editorCandidatesPanel" class="editor-candidates" hidden><strong>选择替换镜头</strong><p class="muted">候选须足够容纳原片段时长，已在其他位置使用的镜头不会重复采用。</p><div id="editorCandidates"></div><button id="moreEditorCandidatesBtn" class="small-action" type="button">加载更多候选</button><button id="closeEditorCandidatesBtn" class="small-action" type="button">收起</button></section>
+                <form id="editorConfigForm" class="plan-settings"><label>调整目标时长（秒，空白按可用素材）<input id="editorTargetDuration" type="number" min="0.1" max="600" step="0.1"></label><label>画幅<select id="editorAspectRatio"><option value="9:16">竖屏 9:16</option><option value="16:9">横屏 16:9</option><option value="1:1">方形 1:1</option></select></label><button class="small-action" type="submit">保存设置为新版本</button></form>
+                <details id="editorHistoryDetails"><summary>历史版本</summary><div id="editorHistory"></div><button id="moreEditorHistoryBtn" class="small-action" type="button">加载更多版本</button></details>
+              </section>
+              <div class="plan-budget-notice" id="planBudgetNotice" hidden role="status" aria-live="polite"></div>
+              <div class="render-actions"><button class="secondary-btn" id="previewBtn" type="button" disabled>生成预览</button><button class="primary-btn" id="exportBtn" type="button" disabled>导出高清成片</button></div>
+              <details id="newRenderOptions" hidden><summary>重新生成（新的费用操作）</summary><p>保留旧成片与任务。先获取新报价，再决定是否另建任务。</p><button id="newPreviewQuoteBtn" class="small-action" type="button">预览版重新报价</button><button id="newHighQuoteBtn" class="small-action" type="button">高清版重新报价</button></details><div class="render-status" id="renderStatus" role="status" aria-live="polite"></div>
+              <video class="preview-video" id="previewVideo" controls playsinline hidden></video>
+              <div class="remote-artifact" id="remoteArtifact" hidden></div>
+              <section id="renderQuotePanel" class="subtitle-editor" hidden aria-label="生成报价"></section><section id="deliveryPanel" class="subtitle-editor" hidden aria-label="交付与分享"></section><section id="workReviewPanel" class="subtitle-editor" hidden aria-label="成片审核与领取"></section>
+            </section>
+          </div>
+        </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/web/state.js" defer></script>
+<script src="/web/network.js" defer></script>
+<script src="/web/projects.js" defer></script>
+<script src="/web/tasks.js" defer></script>
+<script src="/web/vendor-sha256.js" defer></script>
+<script src="/web/assets.js" defer></script>
+<script src="/web/uploads.js" defer></script>
+<script src="/web/workspace.js" defer></script>
+<script src="/web/editor.js" defer></script>
+<script src="/web/clip-editor.js" defer></script>
+<script src="/web/subtitle-editor.js" defer></script>
+<script src="/web/layer-editor.js" defer></script>
+<script src="/web/reviews.js" defer></script>
+<script src="/web/delivery.js" defer></script>
+<script src="/web/billing.js" defer></script>
+<script src="/web/preparation.js" defer></script>
+<script src="/web/batch-form.js" defer></script>
+<script src="/web/batches.js" defer></script>
+<script src="/web/batch-runs.js" defer></script>
+<script src="/web/batch-delivery.js" defer></script>
+<script src="/web/storyboard-form.js" defer></script>
+<script src="/web/storyboards.js" defer></script>
+<script src="/web/shot-matching-form.js" defer></script>
+<script src="/web/shot-matching.js" defer></script>
+<script src="/web/account.js" defer></script>
+<script src="/app.js" defer></script>
+</body>
+</html>

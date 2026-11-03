@@ -1,0 +1,1 @@
+.review-note {box-sizing:border-box;min-height:140rpx;width:100%}.review-text {white-space:pre-wrap}.review-issue {padding:20rpx 0;border-top:1rpx solid #d7deeb}.review-error {color:#a72533}.review-warning {color:#8c5d00}.review-info {color:#276043}

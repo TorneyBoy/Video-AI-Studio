@@ -1,0 +1,115 @@
+name: video-ai-studio
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-video_ai_studio}
+      POSTGRES_USER: ${POSTGRES_USER:-video_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-video_ai_dev}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    logging: &app-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment: &app-environment
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
+      METRICS_API_SECRET: ${METRICS_API_SECRET:-}
+      APP_NAME: ${APP_NAME:-Video AI Studio}
+      API_PREFIX: ${API_PREFIX:-/api/v1}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-video_ai}:${POSTGRES_PASSWORD:-video_ai_dev}@postgres:5432/${POSTGRES_DB:-video_ai_studio}
+      STORAGE_ROOT: /app/data/storage
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5368709120}
+      ASSET_STORAGE_MODE: ${ASSET_STORAGE_MODE:-external}
+      ASSET_UPLOAD_SESSION_TTL_SECONDS: ${ASSET_UPLOAD_SESSION_TTL_SECONDS:-3600}
+      STORAGE_ATTESTATION_SECRET: ${STORAGE_ATTESTATION_SECRET:-}
+      STORAGE_GATEWAY_URL: ${STORAGE_GATEWAY_URL:-}
+      STORAGE_GATEWAY_API_KEY: ${STORAGE_GATEWAY_API_KEY:-}
+      STORAGE_GATEWAY_TIMEOUT_SECONDS: ${STORAGE_GATEWAY_TIMEOUT_SECONDS:-30}
+      STORAGE_UPLOAD_HOSTS: ${STORAGE_UPLOAD_HOSTS:-}
+      STORAGE_PUBLIC_HOSTS: ${STORAGE_PUBLIC_HOSTS:-}
+      DELIVERY_PACKAGE_ENABLED: ${DELIVERY_PACKAGE_ENABLED:-false}
+      DELIVERY_PACKAGE_MAX_BYTES: ${DELIVERY_PACKAGE_MAX_BYTES:-104857600}
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-7200}
+      WORKFLOW_WORKER_ID: ${WORKFLOW_WORKER_ID:-compose-worker}
+      WORKFLOW_LEASE_SECONDS: ${WORKFLOW_LEASE_SECONDS:-7200}
+      DISPATCH_GLOBAL_LIMIT: ${DISPATCH_GLOBAL_LIMIT:-8}
+      DISPATCH_TENANT_LIMIT: ${DISPATCH_TENANT_LIMIT:-4}
+      DISPATCH_PROJECT_LIMIT: ${DISPATCH_PROJECT_LIMIT:-3}
+      DISPATCH_BATCH_LIMIT: ${DISPATCH_BATCH_LIMIT:-2}
+      OBSERVATION_QUEUE_WARNING_SECONDS: ${OBSERVATION_QUEUE_WARNING_SECONDS:-300}
+      OBSERVATION_REMOTE_WARNING_SECONDS: ${OBSERVATION_REMOTE_WARNING_SECONDS:-900}
+      OBSERVATION_BILLING_WARNING_SECONDS: ${OBSERVATION_BILLING_WARNING_SECONDS:-3600}
+      OBSERVATION_WORKER_STALE_SECONDS: ${OBSERVATION_WORKER_STALE_SECONDS:-120}
+      AUTH_MODE: ${AUTH_MODE:-development_header}
+      TRUSTED_PROXY_SHARED_SECRET: ${TRUSTED_PROXY_SHARED_SECRET:-}
+      TRUSTED_PROXY_MAX_AGE_SECONDS: ${TRUSTED_PROXY_MAX_AGE_SECONDS:-300}
+      PROVIDER_MODE: ${PROVIDER_MODE:-api_only}
+      PROVIDER_REGISTRY_PATH: ${PROVIDER_REGISTRY_PATH:-}
+      PROVIDER_REGISTRY_JSON: ${PROVIDER_REGISTRY_JSON:-}
+      PROVIDER_WEBHOOK_SECRET: ${PROVIDER_WEBHOOK_SECRET:-}
+      PROVIDER_WEBHOOK_MAX_AGE_SECONDS: ${PROVIDER_WEBHOOK_MAX_AGE_SECONDS:-300}
+      PROVIDER_WEBHOOK_REQUIRE_REQUEST_ID: ${PROVIDER_WEBHOOK_REQUIRE_REQUEST_ID:-true}
+      DEBUG: ${DEBUG:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - media_storage:/app/data/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    logging: *app-logging
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment: *app-environment
+    command: ["python", "-m", "app.cli", "process-jobs", "--watch", "--limit", "10", "--interval", "${WORKER_POLL_INTERVAL:-2}"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - media_storage:/app/data/storage
+    restart: unless-stopped
+
+  # MinIO is an optional object-storage development service.  The current
+  # local adapter uses STORAGE_ROOT; a future S3 adapter can target it.
+  minio:
+    image: minio/minio:RELEASE.2025-02-18T16-25-55Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-video_ai_dev}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-video_ai_dev_secret}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    profiles: ["object-storage"]
+
+volumes:
+  postgres_data:
+  media_storage:
+  minio_data:

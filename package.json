@@ -1,0 +1,15 @@
+{
+  "name": "creative-console",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轻量级内容生产控制台前端骨架",
+  "scripts": {
+    "dev": "node scripts/dev-server.cjs",
+    "start": "node scripts/dev-server.cjs",
+    "preview": "node scripts/dev-server.cjs",
+    "prepare-client-deps": "node scripts/bundle-client-deps.cjs"
+  },
+  "devDependencies": {
+    "js-sha256": "1.0.0"
+  }
+}

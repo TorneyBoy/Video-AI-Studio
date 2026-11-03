@@ -1,0 +1,120 @@
+{
+  "providers": [
+    {
+      "name": "contract-video",
+      "kind": "http",
+      "endpoint": "https://contract-video-gateway.example.test",
+      "path": "/v1/video/submit",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "headers_env": {
+        "Authorization": "CONTRACT_VIDEO_API_KEY"
+      },
+      "callback_secret_env": "CONTRACT_VIDEO_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "video_editing",
+          "cost": {"per_minute": 0.12, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "video_generation",
+          "cost": {"per_minute": 0.35, "currency": "USD", "billing_unit": "second"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "media_analysis",
+          "cost": {"per_request": 0.01, "currency": "USD", "billing_unit": "request"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "enhancement",
+          "cost": {"per_minute": 0.08, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "contract-video-model",
+        "version": "2026-10-13",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "contract-voice",
+      "kind": "http",
+      "endpoint": "https://contract-voice-gateway.example.test",
+      "path": "/v1/audio/submit",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "headers_env": {
+        "Authorization": "CONTRACT_VOICE_API_KEY"
+      },
+      "callback_secret_env": "CONTRACT_VOICE_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "voice_tts",
+          "cost": {"per_request": 0.02, "currency": "USD", "billing_unit": "request"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "voice_clone",
+          "cost": {"per_request": 0.08, "currency": "USD", "billing_unit": "request"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "voice_conversion",
+          "cost": {"per_minute": 0.06, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "contract-voice-model",
+        "version": "2026-10-13",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    },
+    {
+      "name": "contract-avatar",
+      "kind": "http",
+      "endpoint": "https://contract-avatar-gateway.example.test",
+      "path": "/v1/avatar/submit",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "headers_env": {
+        "Authorization": "CONTRACT_AVATAR_API_KEY"
+      },
+      "callback_secret_env": "CONTRACT_AVATAR_CALLBACK_SECRET",
+      "capabilities": [
+        {
+          "name": "motion_transfer",
+          "cost": {"per_minute": 0.5, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "face_transform",
+          "cost": {"per_minute": 0.4, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        },
+        {
+          "name": "lip_sync",
+          "cost": {"per_minute": 0.3, "currency": "USD", "billing_unit": "minute"},
+          "commercial_allowed": true
+        }
+      ],
+      "model": {
+        "model_id": "contract-avatar-model",
+        "version": "2026-10-13",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed"
+        }
+      }
+    }
+  ]
+}

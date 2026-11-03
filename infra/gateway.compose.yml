@@ -1,0 +1,29 @@
+name: video-ai-media-gateway
+
+services:
+  storage-gateway:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        INSTALL_EXTRAS: gateway,ice,fc
+    command: ["uvicorn", "media_gateway.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]
+    env_file: ../.env.gateway
+    ports:
+      - "127.0.0.1:8100:8100"
+    volumes:
+      - gateway_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  gateway_data:

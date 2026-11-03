@@ -1,0 +1,20 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["fc:InvokeFunction"],
+      "Resource": ["acs:fc:cn-beijing:1253063092481585:functions/video-ai-shot-analysis"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["fc:GetAsyncTask"],
+      "Resource": ["acs:fc:cn-beijing:1253063092481585:functions/video-ai-shot-analysis/async-tasks/shots_*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["ice:SubmitASRJob", "ice:GetSmartHandleJob"],
+      "Resource": ["*"]
+    }
+  ]
+}

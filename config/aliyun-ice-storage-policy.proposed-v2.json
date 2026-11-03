@@ -1,0 +1,20 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetBucketInfo", "oss:GetBucketLocation"],
+      "Resource": ["acs:oss:*:*:video-ai-huayuan-cn-beijing"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": ["acs:oss:*:*:video-ai-huayuan-cn-beijing/tenants/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": ["acs:oss:*:*:video-ai-huayuan-cn-beijing/icetemp/subtitle/*"]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+# Existing database and gateway state are required. No database/volume is
+# created here. Stop the M1 API/edge/Worker before using these same ports.
+name: video-ai-m2
+x-control: &control
+  image: ${CONTROL_IMAGE:?Set the reviewed immutable control image ID or digest}
+  network_mode: host
+  env_file: ${M2_RUNTIME_ENV:?Set an absolute private M2 runtime env file}
+  extra_hosts: ["video-ai-gateway.internal:127.0.0.1"]
+  volumes:
+    - ${M2_CA_FILE:?Set the existing internal CA file}:/run/video-ai/ca.pem:ro
+    - ${M2_PROVIDER_REGISTRY:?Set the reviewed registry file}:/run/video-ai/providers.json:ro
+    - control_data:/app/data
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs: ["/tmp:size=32m,mode=1777"]
+  pids_limit: 128
+  mem_limit: 512m
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "3"}
+
+services:
+  migrate:
+    <<: *control
+    profiles: [migration]
+    command: ["python", "-m", "app.cli", "migrate"]
+    restart: "no"
+  api:
+    <<: *control
+    command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--no-access-log"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+  worker:
+    <<: *control
+    profiles: [execution]
+    command: ["python", "-m", "app.cli", "process-jobs", "--watch", "--interval", "3", "--limit", "2"]
+    restart: unless-stopped
+  alert-watch:
+    <<: *control
+    profiles: [observation]
+    command: ["python", "-m", "app.cli", "ops-check", "--watch", "--interval", "60"]
+    restart: unless-stopped
+
+volumes:
+  control_data:
+    external: true
+    name: ${M2_CONTROL_DATA_VOLUME:?Set the existing control volume name}

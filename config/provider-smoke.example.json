@@ -1,0 +1,35 @@
+{
+  "providers": [
+    {
+      "name": "staging-video-gateway",
+      "kind": "http",
+      "enabled": true,
+      "endpoint": "https://replace-with-your-staging-gateway.example",
+      "path": "/v1/video/submit",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "poll_interval_seconds": 1,
+      "poll_timeout_seconds": 20,
+      "max_poll_attempts": 5,
+      "headers_env": {},
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": ["remote_uri"],
+          "output_types": ["video"],
+          "commercial_allowed": true,
+          "cost": {"per_request": 0, "currency": "USD", "billing_unit": "request"}
+        }
+      ],
+      "model": {
+        "model_id": "staging-video-model",
+        "version": "staging-1",
+        "weights_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "status": "approved",
+          "weights_license": "provider-managed-staging-contract"
+        }
+      }
+    }
+  ]
+}

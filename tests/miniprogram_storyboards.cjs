@@ -1,0 +1,36 @@
+// Compile and exercise actual native Page/state; not WeChat platform acceptance.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFileSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),output=fs.mkdtempSync(path.join(os.tmpdir(),'video-ai-mini-storyboards-')),values=new Map(),calls=[];
+let page,project='project',handler;
+global.wx={getStorageSync:key=>values.get(key),setStorageSync:(key,value)=>values.set(key,structuredClone(value)),removeStorageSync:key=>values.delete(key),showModal:async()=>({confirm:true}),stopPullDownRefresh(){},createVideoContext:()=>({pause(){}})};
+global.Page=definition=>{page=definition;page.setData=changes=>Object.assign(page.data,changes);};
+(async()=>{
+  execFileSync(process.execPath,[path.join(root,'miniprogram/node_modules/typescript/bin/tsc'),'--project',path.join(root,'miniprogram/tsconfig.json'),'--noEmit','false','--module','Node16','--moduleResolution','Node16','--rootDir',path.join(root,'miniprogram/src'),'--outDir',output],{stdio:'pipe'});
+  fs.cpSync(path.join(root,'miniprogram/src/vendor'),path.join(output,'vendor'),{recursive:true});
+  const apiPath=path.join(output,'shared/api.js'),personalSession={profile:{id:'person'},activeProject:()=>project,restore:async()=>personalSession.profile,request:async(...args)=>{calls.push(args);return handler(...args);}};
+  require.cache[apiPath]={id:apiPath,filename:apiPath,loaded:true,exports:{personalSession,message:error=>error.message}};
+  const State=require(path.join(output,'shared/storyboards.js')),Forms=require(path.join(output,'vendor/storyboard-form.js')),{ClientError}=require(path.join(output,'shared/contracts.js'));
+  const draft=Forms.empty();draft.shots[0].intent='展示真实商品';draft.shots[0].visual.subject='蓝色商品';
+  const cache=State.cache();cache.draft=draft;State.persist(cache);
+  const op=State.operation('create','/projects/project/storyboards','/projects/project/storyboard-requests/',{reference_id:null,content:draft});
+  handler=async()=>{throw new ClientError('submission_unknown','Disconnected',0,true);};await assert.rejects(State.send(cache,op));const original=calls.at(-1);assert.equal(State.cache().pending.key,op.key);
+  await assert.rejects(State.send(State.cache(),State.operation('create',op.path,op.receipt,{different:true})),error=>error.code==='operation_unconfirmed');
+  require(path.join(output,'pages/storyboards/index.js'));
+  const initial={document_id:'doc',revision_id:'v1',head_revision_id:'v1',number:1,project_id:'project',reference_id:null,content:draft};
+  handler=async endpoint=>endpoint.includes('/storyboard-requests/')?{found:false}:endpoint.endsWith('/storyboards')?initial:[];
+  await page.onShow();await page.recover({currentTarget:{dataset:{resend:true}}});
+  assert.deepEqual(calls.at(-1),original);assert.equal(State.cache().pending,null);assert.equal(page.data.cache.base.revision_id,'v1');
+  page.addShot();assert.equal(page.data.content.shots.length,2);assert.equal(page.data.totalSeconds,10);
+  const durationId=page.data.content.shots[1].id;
+  page.shotInput({currentTarget:{dataset:{id:durationId,field:'duration_ms'}},detail:{value:'1.0001'}});
+  const beforeInvalid=calls.length;await page.save({currentTarget:{dataset:{}}});assert.equal(calls.length,beforeInvalid);
+  page.shotInput({currentTarget:{dataset:{id:durationId,field:'duration_ms'}},detail:{value:'5'}});
+  page.lockShot({currentTarget:{dataset:{id:page.data.content.shots[1].id}}});const locked=Forms.copy(page.data.content.shots[1]);
+  page.shotInput({currentTarget:{dataset:{id:locked.id,field:'visual.subject'}},detail:{value:'不应改写'}});assert.deepEqual(page.data.content.shots[1],locked);
+  page.factAction({currentTarget:{dataset:{id:'nonexistent',action:'delete'}}});
+  handler=async()=>{throw new ClientError('submission_unknown','Disconnected',0,true);};await page.save({currentTarget:{dataset:{}}});assert.ok(page.data.pending);
+  handler=async()=>({found:true,result:{...initial,revision_id:'v2',head_revision_id:'v3',number:2}});await page.recover({currentTarget:{dataset:{}}});assert.equal(page.data.cache.base.revision_id,'v1');assert.equal(page.data.content.shots.length,2);
+  let complete;handler=()=>new Promise(resolve=>complete=resolve);const delayed=page.openStory({currentTarget:{dataset:{id:'doc'}}});await Promise.resolve();project='changed';page.onHide();complete(initial);await delayed;assert.notEqual(State.cache().base?.document_id,'doc');
+  assert.ok([...values.values()].every(value=>!JSON.stringify(value).includes('access_token')));
+  console.log('PASS compiled native storyboard edit/lock, original-request replay, historical receipt and context fencing; no WeChat device');
+})().catch(error=>{console.error(error.stdout?.toString()||error);process.exitCode=1;}).finally(()=>{delete global.wx;delete global.Page;fs.rmSync(output,{recursive:true,force:true});});

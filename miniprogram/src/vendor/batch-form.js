@@ -1,0 +1,21 @@
+/* Canonical browser/native batch form rules. Sync the exact file to the
+ * mini-program vendor directory; no platform API or media data belongs here. */
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.BatchForms=factory();})(typeof globalThis!=='undefined'?globalThis:this,function(){
+ 'use strict';
+ const fields=['template_id','target_duration','aspect_ratio','asset_ids'];
+ function clone(value){return JSON.parse(JSON.stringify(value));}
+ function settings(value={}){const result={};for(const field of fields)if(Object.prototype.hasOwnProperty.call(value,field))result[field]=field==='asset_ids'?[...new Set(value[field])].sort():value[field];return result;}
+ function empty(){return{name:'新批次',shared:{template_id:null,target_duration:null,aspect_ratio:'9:16',asset_ids:[]},items:[]};}
+ function body(form){return{name:String(form.name).trim(),shared:settings(form.shared),items:form.items.map(row=>({key:row.key,name:String(row.name||'').trim(),overrides:settings(row.overrides)}))};}
+ function key(){return'item_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,13);}
+ function append(form,rows){if(form.items.length+rows.length>100)throw new Error('本次最多100项，请拆分批次');return{...form,items:[...form.items,...rows.map(row=>({key:key(),name:row.name||'任务 '+(form.items.length+1),overrides:settings(row.overrides||{})}))]};}
+ function copy(form,keys){return append(form,form.items.filter(row=>keys.includes(row.key)).map(row=>({name:row.name+' 副本',overrides:clone(row.overrides)})));}
+ function effective(form,row){return{...form.shared,...row.overrides};}
+ function duration(value){if(!String(value).trim())return null;const n=Number(value);if(!Number.isFinite(n)||n<.1||n>600)throw new Error('时长需为0.1至600秒');return n;}
+ function paste(text){let values;if(text.trim().startsWith('[')){values=JSON.parse(text);if(!Array.isArray(values))throw new Error('请粘贴任务数组');return values.map((row,index)=>{if(!row||typeof row!=='object'||Array.isArray(row)||Object.keys(row).some(field=>!['name',...fields].includes(field)))throw new Error('第'+(index+1)+'行含有未知字段');if(typeof row.name!=='string'||!row.name.trim()||row.name.length>200)throw new Error('第'+(index+1)+'行请填写名称');if(row.asset_ids!==undefined&&(!Array.isArray(row.asset_ids)||row.asset_ids.some(id=>typeof id!=='string')))throw new Error('第'+(index+1)+'行素材须为ID数组');return{name:row.name.trim(),overrides:settings(row)};});}
+  values=text.split(/\r?\n/).filter(line=>line.trim()).map((line,index)=>{const columns=line.split('\t');if(columns.length>5)throw new Error('第'+(index+1)+'行最多5列');const [name,assets,template,seconds,ratio]=columns.map(value=>value.trim());if(!name||name.length>200)throw new Error('第'+(index+1)+'行名称需为1至200字');const overrides={};if(assets)overrides.asset_ids=assets.split(/[,，]/).map(value=>value.trim()).filter(Boolean);if(template)overrides.template_id=template;if(seconds)overrides.target_duration=duration(seconds);if(ratio){if(!['9:16','16:9','1:1'].includes(ratio))throw new Error('第'+(index+1)+'行画幅不正确');overrides.aspect_ratio=ratio;}return{name,overrides};});if(!values.length)throw new Error('请至少粘贴一个任务名称');return values;}
+ function validate(form){const issues=[];if(!form.name.trim())issues.push({key:null,field:'name',message:'请填写批次名称'});if(!form.items.length)issues.push({key:null,field:'items',message:'请新增任务'});if(form.items.length>100)issues.push({key:null,field:'items',message:'本次最多100项'});
+  for(const row of form.items){const value=effective(form,row);if(!value.template_id)issues.push({key:row.key,field:'template_id',message:'请选择共用或单项模板'});if(value.target_duration!==null&&(typeof value.target_duration!=='number'||!Number.isFinite(value.target_duration)||value.target_duration<.1||value.target_duration>600))issues.push({key:row.key,field:'target_duration',message:'时长需为0.1至600秒'});if(!value.asset_ids.length)issues.push({key:row.key,field:'asset_ids',message:'请分配共用或单项素材'});if(value.asset_ids.length>100)issues.push({key:row.key,field:'asset_ids',message:'每项最多100个素材'});}
+  const unique=new Set(form.items.flatMap(row=>effective(form,row).asset_ids));if(unique.size>100)issues.push({key:null,field:'asset_ids',message:'本次最多100个不同素材'});return issues;}
+ return{empty,body,append,copy,effective,paste,duration,clone,validate};
+});

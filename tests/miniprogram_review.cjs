@@ -1,0 +1,58 @@
+// Real native page/state code with offline wx APIs, not a device acceptance.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const {execFileSync} = require('node:child_process');
+const root = path.resolve(__dirname,'..');
+const output = fs.mkdtempSync(path.join(os.tmpdir(),'video-ai-mini-review-'));
+const watchdog = setTimeout(() => {console.error('Native review contract did not finish');process.exit(1);},15000);
+let page; const values=new Map(); const downloads=[]; const albums=[]; const seeks=[];
+global.wx={getStorageSync:key=>values.get(key),setStorageSync:(key,value)=>values.set(key,structuredClone(value)),removeStorageSync:key=>values.delete(key),
+  createVideoContext:()=>({seek:time=>seeks.push(time)}),downloadFile:options=>{downloads.push(options);options.success({statusCode:200,tempFilePath:'wxfile://offline-media'});},
+  saveVideoToPhotosAlbum:options=>{albums.push(options.filePath);options.success();}};
+global.Page=definition=>{page=definition;};
+(async()=>{
+  execFileSync(process.execPath,[path.join(root,'miniprogram/node_modules/typescript/bin/tsc'),'--project',path.join(root,'miniprogram/tsconfig.json'),
+    '--noEmit','false','--module','Node16','--moduleResolution','Node16','--rootDir',path.join(root,'miniprogram/src'),'--outDir',output],{stdio:'pipe'});
+  fs.cpSync(path.join(root,'miniprogram/src/vendor'),path.join(output,'vendor'),{recursive:true});
+  let handler;const calls=[];const apiPath=path.join(output,'shared/api.js');
+  const personalSession={profile:{id:'owner',tenant_id:'tenant'},activeProject:()=> 'project',request:async(...args)=>{calls.push(args);return handler(...args);}};
+  require.cache[apiPath]={id:apiPath,filename:apiPath,loaded:true,exports:{personalSession,message:error=>error.message}};
+  const {ClientError}=require(path.join(output,'shared/contracts.js'));
+  const state=require(path.join(output,'shared/review-state.js'));
+  require(path.join(output,'pages/work-detail/index.js'));
+  page.data=structuredClone(page.data);page.setData=change=>Object.assign(page.data,change);
+  let report={artifact_id:'artifact',binding_hash:'a'.repeat(64),binding:{},status:'pending',latest:null,can_review:true,can_preview:true,can_download:false,
+    quality_ready:true,quality_scope:'结构质检',reason:'请审阅',duration:8,measurements:{width:1080,height:1920},revision_number:1,origin_job_id:null};
+  handler=async endpoint=>endpoint.endsWith('/review') ? report : {url:'https://fixture.invalid/preview',expires_at:'later'};
+  await page.onLoad({id:'artifact'});assert.equal(page.data.reviewLabel,'待审核');await page.saveVideo();assert.equal(downloads.length,0);
+  page.videoTime({detail:{currentTime:1.25}});page.seekIssue({currentTarget:{dataset:{start:'1.25'}}});assert.deepEqual(seeks,[1.25]);
+  page.reviewNote({detail:{value:'字幕需修订'}});page.addIssue();page.issueInput({currentTarget:{dataset:{index:0,field:'message'}},detail:{value:'修订这句'}});
+  assert.equal(page.data.form.issues[0].start,'1.250');
+  handler=async()=>{throw new ClientError('review_revision_conflict','Other page reviewed',409);};
+  await page.submitReview({currentTarget:{dataset:{decision:'changes_requested'}}});
+  assert.equal(page.data.form.note,'字幕需修订');assert.equal(state.readReviewState('artifact').pending,null);assert.equal(page.data.reviewConflict,true);
+  const before=calls.length;await page.submitReview({currentTarget:{dataset:{decision:'approved'}}});assert.equal(calls.length,before);
+  report={...report,latest:{id:'other',number:1,decision:'approved',note:'Other',issues:[]}};
+  handler=async()=>report;await page.loadReview();page.removeIssue({currentTarget:{dataset:{index:0}}});page.reviewNote({detail:{value:'重新审阅通过'}});
+  handler=async()=>{throw new ClientError('submission_unknown','Disconnected',0,true);};
+  await page.submitReview({currentTarget:{dataset:{decision:'approved'}}});const pending=state.readReviewState('artifact').pending;const original=calls.at(-1);
+  assert.equal(pending.body.base_review_id,'other');assert.equal(pending.body.note,'重新审阅通过');
+  await assert.rejects(state.sendReview(state.reviewOperation('artifact',{...pending.body,note:'different'}),page.data.form),error=>error.code==='review_unconfirmed');
+  handler=async()=>({found:false,review:null,current:report});await page.recoverReview({currentTarget:{dataset:{}}});assert.equal(page.data.pending.key,pending.key);
+  report={...report,status:'approved',can_download:true,latest:{id:'saved',number:2,decision:'approved',note:'重新审阅通过',issues:[]}};
+  handler=async(...args)=>{assert.deepEqual(args,original);return{review:report.latest,current:report};};await page.recoverReview({currentTarget:{dataset:{repeat:true}}});
+  assert.equal(page.data.pending,null);assert.equal(page.data.report.latest.id,'saved');assert.equal(page.data.form.note,'');
+  handler=async()=>({url:'https://fixture.invalid/download?short-signature'});await page.saveVideo();assert.equal(albums.length,1);assert.equal(downloads[0].header,undefined);
+  assert.ok(!JSON.stringify([...values.values()]).match(/https:|short-signature|wxfile:|access_token/));
+  page.reviewNote({detail:{value:'Quota draft'}});const previousSet=wx.setStorageSync;wx.setStorageSync=()=>{throw new Error('Quota');};
+  const beforeQuota=calls.length;await page.submitReview({currentTarget:{dataset:{decision:'approved'}}});assert.equal(calls.length,beforeQuota);assert.equal(page.data.form.note,'Quota draft');wx.setStorageSync=previousSet;
+  let finishDownload;wx.downloadFile=options=>{finishDownload=options.success;};const saving=page.saveVideo();
+  await new Promise(resolve=>setImmediate(resolve));page.onHide();finishDownload({statusCode:200,tempFilePath:'wxfile://late'});await saving;assert.equal(albums.length,1);
+  personalSession.profile={id:'other-user',tenant_id:'other-tenant'};await page.onShow();assert.equal(page.data.report,null);assert.equal(page.data.url,'');
+  page.onUnload();console.log('native review state/receipts/save lifecycle: PASS (offline; no WeChat/device/media execution)');
+})().catch(error=>{console.error(error.stdout?.toString()||error);process.exitCode=1;}).finally(()=>{
+  clearTimeout(watchdog);if(!path.resolve(output).startsWith(path.resolve(os.tmpdir())+path.sep+'video-ai-mini-review-'))throw new Error('Unsafe temporary path');
+  fs.rmSync(output,{recursive:true,force:true});
+});

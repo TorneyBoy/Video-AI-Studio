@@ -1,0 +1,78 @@
+{
+  "providers": [
+    {
+      "name": "aliyun-hosted-analysis",
+      "kind": "http",
+      "endpoint": "https://video-ai-gateway.internal:8100",
+      "path": "/v1/analysis",
+      "poll_path": "/v1/analysis/{provider_job_id}",
+      "health_path": "/v1/analysis/health",
+      "headers_env": {"Authorization": "MEDIA_GATEWAY_AUTHORIZATION"},
+      "callback_secret_env": "MEDIA_GATEWAY_CALLBACK_SECRET",
+      "timeout_seconds": 120,
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 540,
+      "max_poll_attempts": 180,
+      "model": {
+        "model_id": "aliyun-hosted-media-analysis",
+        "version": "media-analysis-2-20261018",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "project-code-and-provider-api-terms",
+          "weights_license": "provider-managed",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "ICE:2020-11-09;FC-package:cfee7b488d67a0d13284124465d2a5f4f49380e349fff8a0460a6ef35b1674ba;detector:color-change-pts/1",
+          "allowed_regions": ["cn-beijing"]
+        }
+      },
+      "capabilities": [{
+        "name": "media_analysis",
+        "input_types": ["json", "remote_video"],
+        "output_types": ["json"],
+        "commercial_allowed": true,
+        "regions": ["cn-beijing"],
+        "acceptance": {"status": "verified", "model_version": "media-analysis-2-20261018", "report_ref": "docs/m1-supplier-acceptance.md#mandarin-analysis-20261018"},
+        "price_version": "m1-reservation-envelope-20261018",
+        "cost": {"per_request": 0.5, "currency": "CNY", "billing_unit": "request"},
+        "limits": {"max_input_bytes": 104857600, "max_duration_seconds": 30, "max_concurrent": 1, "features": ["media_probe", "abrupt_shots", "timestamped_asr", "thumbnails"]}
+      }]
+    },
+    {
+      "name": "aliyun-ice-editing",
+      "kind": "http",
+      "endpoint": "https://video-ai-gateway.internal:8100",
+      "path": "/v1/render",
+      "poll_path": "/v1/render/{provider_job_id}",
+      "health_path": "/v1/render/health",
+      "headers_env": {"Authorization": "MEDIA_GATEWAY_AUTHORIZATION"},
+      "callback_secret_env": "MEDIA_GATEWAY_CALLBACK_SECRET",
+      "timeout_seconds": 120,
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 540,
+      "max_poll_attempts": 180,
+      "model": {
+        "model_id": "aliyun-ice-cloud-editing",
+        "version": "2020-11-09",
+        "license_snapshot": {
+          "commercial_allowed": true,
+          "code_license": "provider-api-terms",
+          "weights_license": "provider-managed",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "ICE-API:2020-11-09;SDK:6.20.2;timeline-compiler:initial-v3-accepted-subset",
+          "allowed_regions": ["cn-beijing"]
+        }
+      },
+      "capabilities": [{
+        "name": "video_editing",
+        "input_types": ["json", "remote_video"],
+        "output_types": ["video"],
+        "commercial_allowed": true,
+        "regions": ["cn-beijing"],
+        "acceptance": {"status": "verified", "model_version": "2020-11-09", "report_ref": "docs/m1-supplier-acceptance.md#cloud-render-20261018"},
+        "price_version": "aliyun-ims-basic-clip-cn-20261018",
+        "cost": {"per_request": 0.06, "currency": "CNY", "billing_unit": "started_minute"},
+        "limits": {"max_output_duration_seconds": 30, "max_concurrent": 1, "formats": ["mp4"], "features": ["single_video_track", "trim", "embedded_audio_volume", "contain", "basic_subtitles"]}
+      }]
+    }
+  ]
+}

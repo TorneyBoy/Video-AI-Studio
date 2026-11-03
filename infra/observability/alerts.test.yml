@@ -1,0 +1,51 @@
+rule_files:
+  - video-ai-alerts.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="video-ai-control",instance="fixture"}'
+        values: '0+0x6'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: VideoAIControlUnavailable
+        exp_alerts:
+          - exp_labels: {job: video-ai-control, instance: fixture, severity: critical, service: video-ai-studio}
+            exp_annotations: {summary: Control API metrics scrape is unavailable}
+  - interval: 1m
+    input_series:
+      - series: 'video_ai_alert_active{job="video-ai-control",instance="one",code="queue_aging",severity="warning"}'
+        values: '1 1 1 0 0'
+      - series: 'video_ai_alert_active{job="video-ai-control",instance="two",code="queue_aging",severity="warning"}'
+        values: '1 1 1 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: VideoAIOperationalAttention
+        exp_alerts:
+          - exp_labels: {code: queue_aging, severity: warning, service: video-ai-studio}
+            exp_annotations: {summary: Inspect the original task and operational report}
+      - eval_time: 4m
+        alertname: VideoAIOperationalAttention
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'video_ai_http_requests_total{job="video-ai-control",route="/api/v1/projects",status="500",method="GET"}'
+        values: '0+20x20'
+      - series: 'video_ai_http_requests_total{job="video-ai-control",route="/api/v1/projects",status="200",method="GET"}'
+        values: '0+180x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VideoAIHTTPFailures
+        exp_alerts:
+          - exp_labels: {severity: warning, service: video-ai-studio}
+            exp_annotations: {summary: Control API has repeated server errors}
+  - interval: 1m
+    input_series:
+      - series: 'video_ai_http_requests_total{job="video-ai-control",route="/readyz",status="500",method="GET"}'
+        values: '0+100x20'
+      - series: 'video_ai_http_requests_total{job="video-ai-control",route="/api/v1/projects",status="200",method="GET"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VideoAIHTTPFailures
+        exp_alerts: []

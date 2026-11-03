@@ -1,0 +1,17 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ice:SubmitMediaProducingJob",
+        "ice:GetMediaProducingJob",
+        "ice:SubmitSyncMediaInfoJob",
+        "ice:SubmitMediaInfoJob",
+        "ice:GetMediaInfoJob",
+        "ice:GetMediaInfo"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

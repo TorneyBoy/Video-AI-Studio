@@ -1,0 +1,11 @@
+:root{color-scheme:dark;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:#111115;color:#f2f1f8}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:32px 20px;background:radial-gradient(ellipse at 20% 5%,#29213d 0,transparent 55%),#111115}
+.account-shell{width:min(100%,440px);padding:38px;border:1px solid #36333f;border-radius:22px;background:#1a191fcf;box-shadow:0 24px 80px #0004}
+a{color:inherit}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:#c2b0ff;font-size:24px;font-weight:700}.brand span{font-size:16px;color:#f2f1f8}
+.eyebrow{margin-top:38px;color:#a595d4;font-size:12px;letter-spacing:.08em}h1{font-size:32px;line-height:1.25;margin:8px 0 12px;letter-spacing:-.03em}
+.intro,.footnote{font-size:13px;color:#aaa5b7;line-height:1.8}.intro{margin-bottom:28px}label{display:grid;gap:8px;margin:18px 0;font-size:13px;color:#d2ccdd}
+input{width:100%;font:inherit;font-size:15px;background:#121116;border:1px solid #49424f;border-radius:10px;padding:13px 14px;color:#fff;outline:none}input:focus{border-color:#a08af9;box-shadow:0 0 0 3px #8870dc20}
+button,.link-button{display:block;width:100%;font:inherit;font-size:14px;border-radius:10px;padding:13px 16px;cursor:pointer;text-align:center;text-decoration:none}button:disabled{opacity:.6;cursor:wait}
+.primary{background:#8970ec;color:#fff;border:1px solid #a38afc;margin-top:22px;font-weight:600}.secondary{background:transparent;color:#b8abcE;border:0;margin-top:8px}button:focus-visible,a:focus-visible{outline:2px solid #c0acff;outline-offset:4px}
+small,.footnote{color:#928b9e;font-size:12px}#accountStatus{min-height:24px;font-size:13px;line-height:1.6;color:#d4c6ff}#accountStatus[data-error=true]{color:#ffb4aa}.footnote{border-top:1px solid #36313c;padding-top:20px;margin-top:22px}
+[hidden]{display:none!important}@media(max-width:480px){.account-shell{padding:28px 22px}.brand{margin-bottom:10px}h1{font-size:29px}}

@@ -1,0 +1,12 @@
+{
+  "package": "js-sha256",
+  "version": "1.0.0",
+  "license": "MIT",
+  "files": {
+    "web/vendor-sha256.js": "d14e31deaf7b7c3a4a89035b32db12a6b7b92b1b91486fa58a8f107397639027",
+    "miniprogram/src/vendor/sha256.js": "fb7860e00d7718e1c4b0d1df112727261f8cbee112963db1b46ad7b5874041db",
+    "miniprogram/src/vendor/sha256.d.ts": "5bc40ff72c1bdfcd0b186cf0c17d74996d1fcde69ee6ab3b71337ce98b5f2c5f",
+    "third_party/js-sha256-LICENSE.txt": "2153bd2978793748fbe0eb8f838ae2ae19f03f9d4ee5473dd1628a0c0790e4ab"
+  },
+  "note": "Pinned distributions copied unchanged; runtime acceptance belongs to the M2 stage gate."
+}

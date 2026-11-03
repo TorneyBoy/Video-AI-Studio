@@ -1,0 +1,14 @@
+<view class="page">
+  <view class="eyebrow">VIDEO AI STUDIO</view><view class="title">{{register ? '创建个人空间' : '继续你的创作'}}</view>
+  <view class="intro">使用与网页相同的账号，项目和素材会同步到这里。</view>
+  <view class="card" wx:if="{{available}}">
+    <text class="label">账号</text><input class="input" value="{{loginName}}" maxlength="40" bindinput="loginNameInput" placeholder="字母、数字或下划线" />
+    <block wx:if="{{register}}"><text class="label">显示名称</text><input class="input" value="{{displayName}}" maxlength="80" bindinput="displayNameInput" /></block>
+    <text class="label">密码</text><input class="input" password value="{{password}}" maxlength="128" bindinput="passwordInput" />
+    <view class="small" wx:if="{{register}}">密码需为15至128个字符。</view>
+    <view class="row" style="margin-top:28rpx"><text class="small">保持7天登录</text><switch checked="{{remember}}" bindchange="rememberChange" color="#8970ec" /></view>
+    <button class="primary" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{register ? '创建账号并进入' : '登录工作台'}}</button>
+    <button class="secondary" wx:if="{{registrationAvailable}}" bindtap="toggleRegister">{{register ? '已有账号，去登录' : '创建个人账号'}}</button>
+  </view>
+  <view class="status">{{status}}</view><view class="small">微信快捷登录接通后开放。</view>
+</view>

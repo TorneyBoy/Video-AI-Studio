@@ -1,0 +1,27 @@
+ARG PYTHON_IMAGE=python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+FROM ${PYTHON_IMAGE}
+
+# The control plane and credential gateway exchange metadata only. Decoders,
+# FFmpeg and cloud shot-function dependencies are intentionally absent here.
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+COPY pyproject.toml README.md requirements-dev.lock ./
+COPY index.html app.js styles.css ./
+COPY login.html auth.js auth.css ./
+COPY share.html share.js share.css ./
+COPY web ./web
+COPY third_party ./third_party
+COPY app ./app
+COPY media_gateway ./media_gateway
+COPY timeline_engine ./timeline_engine
+COPY scripts/provision_m1_tenant.py ./provision_m1_tenant.py
+ARG INSTALL_EXTRAS=""
+RUN if [ -n "$INSTALL_EXTRAS" ]; then \
+      python -m pip install -c requirements-dev.lock ".[${INSTALL_EXTRAS}]"; \
+    else python -m pip install -c requirements-dev.lock .; fi
+RUN useradd --create-home --uid 10001 app \
+    && mkdir -p /app/data && chown app:app /app/data
+USER app
+ARG SOURCE_CONTENT_ID=development-unattested
+LABEL ink.huayuan.video-ai.source-content-id="${SOURCE_CONTENT_ID}"
+CMD ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--no-access-log"]

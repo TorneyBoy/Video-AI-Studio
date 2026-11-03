@@ -1,0 +1,44 @@
+// Actual TS helper/page execution with offline wx, not WeChat/device acceptance.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFileSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),output=fs.mkdtempSync(path.join(os.tmpdir(),'video-ai-mini-billing-'));let page,handler;
+const watchdog=setTimeout(()=>{console.error('Native billing check timed out');process.exit(1);},15000);
+const values=new Map(),calls=[],navigations=[];global.wx={getStorageSync:key=>values.get(key),setStorageSync:(key,value)=>values.set(key,structuredClone(value)),removeStorageSync:key=>values.delete(key),getStorageInfoSync:()=>({keys:[...values.keys()]}),navigateBack(){},navigateTo:options=>navigations.push(options.url)};
+global.Page=definition=>{page=definition;page.data=structuredClone(page.data);page.setData=change=>Object.assign(page.data,change);};
+(async()=>{
+  execFileSync(process.execPath,[path.join(root,'miniprogram/node_modules/typescript/bin/tsc'),'--project',path.join(root,'miniprogram/tsconfig.json'),'--noEmit','false','--module','Node16','--moduleResolution','Node16','--rootDir',path.join(root,'miniprogram/src'),'--outDir',output],{stdio:'pipe'});
+  fs.cpSync(path.join(root,'miniprogram/src/vendor'),path.join(output,'vendor'),{recursive:true});
+  const apiPath=path.join(output,'shared/api.js'),session={profile:{id:'owner',tenant_id:'tenant'},activeProject:()=> 'project',request:async(...args)=>{calls.push(args);return handler(...args);}};
+  require.cache[apiPath]={id:apiPath,filename:apiPath,loaded:true,exports:{personalSession:session,message:error=>error.message}};
+  const {ClientError}=require(path.join(output,'shared/contracts.js')),state=require(path.join(output,'shared/billing-state.js')),studio=require(path.join(output,'shared/studio-state.js'));
+  assert.equal(state.microText('9007199254740993'),'9,007,199,254.740993');assert.equal(state.microText('-1'),'-0.000001');assert.equal(state.parseLimit('0.000001'),1);assert.throws(()=>state.parseLimit('1e3'));
+  const job={id:'job',project_id:'project',type:'render.high',status:'failed',attempt_count:1,execution_generation:1,max_attempts:3,can_retry:true,can_cancel:false};
+  const intent=state.taskIntent(job,'retry');handler=async()=>{throw new ClientError('unknown','Disconnected',0,true);};await assert.rejects(state.sendTask(intent));const original=calls.at(-1);
+  handler=async()=>({found:false,current:job});await state.checkTask(intent);assert.equal(state.pendingTask().key,intent.key);
+  handler=async()=>{throw new ClientError('forbidden','Permission changed',403);};await assert.rejects(state.sendTask(intent));assert.equal(state.pendingTask().key,intent.key);
+  handler=async(...args)=>{assert.deepEqual(args,original);return{found:true,current:{...job,status:'queued'}};};await state.sendTask(intent);assert.equal(state.pendingTask(),null);
+  const beforeQuota=calls.length,save=wx.setStorageSync;wx.setStorageSync=()=>{throw new Error('Quota');};await assert.rejects(state.sendTask(state.taskIntent(job,'cancel')));assert.equal(calls.length,beforeQuota);wx.setStorageSync=save;
+  const summary={scope:'project_lifetime',period_key:'2026-10',note:'Fixture',totals:[],tenant_policy:{currency:'CNY',monthly_limit_micros:'1000000',task_limit_micros:'600000',remaining_micros:'1000000'},project_policy:{project_id:'project',revision:1,currency:'CNY',limit_micros:'600000',remaining_micros:'600000',can_manage:true}};
+  const quote={id:'quote',project_id:'project',amount_micros:'500000',currency:'CNY',expires_at:'2099-01-01T00:00:00Z',can_submit:true,reasons:[],summary:{revision_number:1},note:'Not a bill'};
+  const routine=async endpoint=>endpoint.endsWith('/render-quote')?quote:endpoint.startsWith('/billing/overview')?summary:{items:endpoint.startsWith('/billing/jobs')?[job]:[],next_skip:1,has_more:false};
+  handler=routine;require(path.join(output,'pages/billing/index.js'));
+  const wxml=fs.readFileSync(path.join(root,'miniprogram/src/pages/billing/index.wxml'),'utf8');for(const match of wxml.matchAll(/bind\w+="(\w+)"/g))assert.equal(typeof page[match[1]],'function','missing '+match[1]);
+  assert.equal(page.entryView({status:'pending_reconciliation',amount_micros:'0',job_id:'job'}).amount,'金额待核对');
+  await page.onLoad({document:'doc',revision:'revision',origin:'origin',quality:'high'});assert.equal(page.data.quoteAmount,'CNY 0.5');assert.equal(studio.pendingStudioOperations().length,0);
+  handler=async(endpoint,method,...args)=>{if(endpoint.endsWith('/render'))throw new ClientError('unknown','Disconnected',0,true);return routine(endpoint);};
+  await page.confirmQuote();const renderIntent=studio.pendingStudioOperations()[0],renderCall=calls.findLast(row=>row[0].endsWith('/render'));assert.equal(renderIntent.body.quote_id,'quote');assert.equal(page.data.pendingRender.key,renderIntent.key);
+  const beforeRepeat=calls.length;await page.confirmQuote();assert.equal(calls.length,beforeRepeat);
+  handler=async(endpoint,method,...args)=>{if(endpoint.endsWith('/render')){assert.deepEqual([endpoint,method,...args],renderCall);throw new ClientError('expired','Permission changed',403);}return routine(endpoint);};
+  await page.recoverRender({currentTarget:{dataset:{repeat:true}}});assert.equal(studio.pendingStudioOperations()[0].key,renderIntent.key);
+  handler=async endpoint=>endpoint.includes('idempotency_key=')?[{id:'render-job'}]:routine(endpoint);await page.recoverRender({currentTarget:{dataset:{}}});assert.equal(studio.pendingStudioOperations().length,0);
+  let finish;handler=()=>new Promise(resolve=>{finish=resolve;});const late=page.getQuote();page.onHide();finish(quote);await late;assert.equal(page.data.quote,null);
+  session.profile={id:'other',tenant_id:'other'};await page.onShow();assert.equal(page.data.summary,null);assert.deepEqual(page.data.entries,[]);
+  session.profile={id:'owner',tenant_id:'tenant'};require(path.join(output,'pages/studio/index.js'));
+  page.setData({revision:{document_id:'doc',revision_id:'revision',number:1,plan:{missing_required_slots:[]},editor:{advanced_support:{supported:true}}},plan:{id:'origin'},canRender:true,renderJob:null});
+  handler=async endpoint=>{assert.ok(endpoint.startsWith('/jobs?')&&endpoint.includes('revision_id=revision'));return[{id:'existing-job',status:'failed'}];};
+  await page.render({currentTarget:{dataset:{quality:'high'}}});assert.equal(navigations.at(-1),'/pages/billing/index?job=existing-job');
+  const beforeFresh=calls.length;await page.render({currentTarget:{dataset:{quality:'high',fresh:true}}});assert.ok(navigations.at(-1).includes('document=doc&revision=revision'));assert.equal(calls.length,beforeFresh);
+  assert.ok(!JSON.stringify([...values.values()]).match(/https:|access_token|provider_job_id/));
+  console.log('native billing price/actions/receipts/CAS/lifecycle: PASS (offline; no WeChat/device/paid calls)');
+})().catch(error=>{console.error(error.stdout?.toString()||error);process.exitCode=1;}).finally(()=>{
+  clearTimeout(watchdog);if(!path.resolve(output).startsWith(path.resolve(os.tmpdir())+path.sep+'video-ai-mini-billing-'))throw new Error('Unsafe temporary path');fs.rmSync(output,{recursive:true,force:true});
+});

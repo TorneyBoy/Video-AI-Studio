@@ -1,0 +1,1 @@
+.transcript{white-space:pre-wrap;font-size:25rpx;line-height:1.6;margin:16rpx 0}.span,.fact{border-top:1rpx solid #393342;padding:20rpx 0}video{width:100%;margin:18rpx 0}.row button{flex:1;font-size:23rpx}textarea.input{width:100%;box-sizing:border-box;min-height:100rpx;height:140rpx}.card>.muted{margin:14rpx 0}

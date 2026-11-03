@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · Video AI Studio</title><link rel="stylesheet" href="/auth.css">
+  <script src="/auth.js" defer></script>
+</head>
+<body>
+  <main class="account-shell">
+    <a class="brand" href="/">✦ <span>Video AI Studio</span></a>
+    <p class="eyebrow">你的创作工作台</p><h1 id="formTitle">继续创作</h1>
+    <p class="intro">网页与微信小程序共用同一个账号和个人空间。</p>
+    <section id="currentAccount" hidden aria-label="当前账号">
+      <strong id="currentName"></strong><p>你已登录，可以继续工作或退出当前账号。</p>
+      <a class="primary link-button" href="/">进入工作台 →</a>
+      <button id="logoutBtn" class="secondary" type="button">退出登录</button>
+    </section>
+    <form id="accountForm" method="post" action="/api/v1/auth/login" hidden>
+      <label>账号<input name="login_name" autocomplete="username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9_]+" placeholder="字母、数字或下划线"></label>
+      <label id="displayField" hidden>显示名称<input name="display_name" autocomplete="nickname" maxlength="80" placeholder="你希望显示的名称"></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="128" placeholder="请输入密码"></label>
+      <small id="passwordHint" hidden>注册密码需为15至128个字符；建议使用便于记忆的长口令。</small>
+      <button id="submitBtn" class="primary" type="submit">登录工作台</button>
+      <button id="switchMode" class="secondary" type="button" hidden>创建个人账号</button>
+    </form>
+    <p id="accountStatus" role="status" aria-live="polite">正在连接账号服务…</p>
+    <p class="footnote">登录状态可在账号中撤销。微信快捷登录在服务接通后开放。</p>
+  </main>
+</body>
+</html>

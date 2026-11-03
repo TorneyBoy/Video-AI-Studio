@@ -1,0 +1,50 @@
+{
+  "pages": [
+    "pages/create/index",
+    "pages/assets/index",
+    "pages/works/index",
+    "pages/mine/index",
+    "pages/login/index",
+    "pages/work-detail/index",
+    "pages/studio/index",
+    "pages/delivery/index",
+    "pages/compare/index",
+    "pages/billing/index",
+    "pages/batches/index",
+    "pages/batch-runs/index",
+    "pages/batch-delivery/index",
+    "pages/storyboards/index",
+    "pages/shot-matching/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "Video AI Studio",
+    "navigationBarBackgroundColor": "#15141b",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#111115"
+  },
+  "tabBar": {
+    "color": "#9c94aa",
+    "selectedColor": "#c2afff",
+    "backgroundColor": "#1a1821",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/create/index",
+        "text": "创作"
+      },
+      {
+        "pagePath": "pages/assets/index",
+        "text": "素材"
+      },
+      {
+        "pagePath": "pages/works/index",
+        "text": "作品"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

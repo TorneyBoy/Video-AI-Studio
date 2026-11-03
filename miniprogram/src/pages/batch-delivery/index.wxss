@@ -1,0 +1,2 @@
+@import "../batch-runs/index.wxss";
+textarea{width:100%;min-height:160rpx;padding:16rpx;box-sizing:border-box;border:1rpx solid #ddd;border-radius:12rpx}.status{white-space:pre-wrap}
