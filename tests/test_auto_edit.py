@@ -1,5 +1,6 @@
 from timeline_engine import AssetType, SlotConstraints, SlotType, TemplateDefinition, TemplateSlot
 from types import SimpleNamespace
+from itertools import permutations
 
 import pytest
 
@@ -44,3 +45,79 @@ def test_target_duration_trims_without_stretching_past_available_source(requeste
     assert clip.source_start == 2 and clip.source_end == source_end
     assert clip.source_end - clip.source_start == pytest.approx(clip.range.end - clip.range.start)
     assert any('不补帧或变速' in warning for warning in plan.warnings) == (requested > 4)
+
+
+def test_required_slots_share_candidates_without_greedy_starvation():
+    template = TemplateDefinition.model_validate({'id': 'global', 'version': '1', 'slots': [
+        {'name': 'opening', 'type': 'video', 'constraints': {'max_items': 2}},
+        {'name': 'product', 'type': 'video', 'constraints': {'required_metadata': ['product']}}]})
+    shots = [ShotFeature(asset_id='product', duration=4, quality=1, metadata={'product': True}),
+             ShotFeature(asset_id='other', duration=4, quality=.5)]
+    plan = AutoEditPlanner().plan(template, shots)
+    assert [(row.slot, row.asset_id) for row in plan.selected] == [('opening', 'other'), ('product', 'product')]
+    assert not plan.missing_required_slots
+    assert AutoEditPlanner().plan(template, list(reversed(shots))) == plan
+
+
+def test_optional_slot_before_required_cannot_take_its_only_source():
+    template = TemplateDefinition.model_validate({'id': 'required-first', 'version': '1', 'slots': [
+        {'name': 'decoration', 'type': 'video', 'required': False, 'constraints': {'max_items': 2}},
+        {'name': 'hero', 'type': 'video', 'constraints': {'required_metadata': ['hero']}}]})
+    plan = AutoEditPlanner().plan(template, [
+        ShotFeature(asset_id='a', duration=2, quality=1, metadata={'hero': True}),
+        ShotFeature(asset_id='b', duration=2, quality=.5)])
+    assert [(row.slot, row.asset_id) for row in plan.selected] == [('decoration', 'b'), ('hero', 'a')]
+    assert not plan.missing_required_slots
+
+
+def test_multiple_required_items_are_reassigned_as_one_global_matching():
+    template = TemplateDefinition.model_validate({'id': 'quotas', 'version': '1', 'slots': [
+        {'name': 'sequence', 'type': 'video', 'constraints': {'min_items': 2, 'max_items': 2}},
+        {'name': 'logo', 'type': 'video', 'constraints': {'required_metadata': ['logo']}}]})
+    plan = AutoEditPlanner().plan(template, [
+        ShotFeature(asset_id='a', duration=2, quality=1, metadata={'logo': True}),
+        ShotFeature(asset_id='b', duration=2, quality=.8), ShotFeature(asset_id='c', duration=2, quality=.6)])
+    assert [(row.slot, row.asset_id) for row in plan.selected] == [('sequence', 'b'), ('sequence', 'c'), ('logo', 'a')]
+    assert not plan.missing_required_slots
+
+
+def test_unfillable_optional_minimum_rolls_back_its_entire_assignment():
+    template = TemplateDefinition.model_validate({'id': 'optional', 'version': '1', 'slots': [
+        {'name': 'hero', 'type': 'video'},
+        {'name': 'extras', 'type': 'video', 'required': False, 'constraints': {'min_items': 2, 'max_items': 3}}]})
+    plan = AutoEditPlanner().plan(template, [ShotFeature(asset_id='a', duration=2, quality=1),
+                                           ShotFeature(asset_id='b', duration=2, quality=.5)])
+    assert [(row.slot, row.asset_id) for row in plan.selected] == [('hero', 'a')]
+    assert not plan.missing_required_slots
+
+
+def test_impossible_required_quotas_keep_honest_missing_slots_and_unique_sources():
+    template = TemplateDefinition.model_validate({'id': 'missing', 'version': '1', 'slots': [
+        {'name': 'one', 'type': 'video'}, {'name': 'two', 'type': 'video'}]})
+    shot = ShotFeature(asset_id='only', duration=2)
+    plan = AutoEditPlanner().plan(template, [shot, shot])
+    assert len(plan.selected) == 1
+    assert plan.missing_required_slots == ('two',)
+
+
+def test_unbounded_slot_keeps_all_eligible_sources_in_stable_score_order():
+    template = TemplateDefinition.model_validate({'id': 'unbounded', 'version': '1', 'slots': [
+        {'name': 'sequence', 'type': 'video', 'constraints': {'max_items': None}}]})
+    plan = AutoEditPlanner().plan(template, [ShotFeature(asset_id='a', duration=2, quality=.2),
+        ShotFeature(asset_id='b', duration=2, quality=.8), ShotFeature(asset_id='c', duration=2, quality=.5)])
+    assert [row.asset_id for row in plan.selected] == ['b', 'c', 'a']
+
+
+def test_required_slot_feasibility_matches_exhaustive_small_assignment_oracle():
+    template = TemplateDefinition.model_validate({'id': 'oracle', 'version': '1', 'slots': [
+        {'name': 'slot' + str(index), 'type': 'video', 'constraints': {'required_metadata': ['slot' + str(index)]}}
+        for index in range(3)]})
+    for graph in range(1 << 9):
+        edges = [[bool(graph & (1 << (slot * 3 + shot))) for shot in range(3)] for slot in range(3)]
+        feasible = any(all(edges[slot][shot] for slot, shot in enumerate(order))
+                       for order in permutations(range(3)))
+        shots = [ShotFeature(asset_id=str(shot), duration=2,
+            metadata={'slot' + str(slot): True for slot in range(3) if edges[slot][shot]}) for shot in range(3)]
+        plan = AutoEditPlanner().plan(template, shots)
+        assert len({row.asset_id for row in plan.selected}) == len(plan.selected)
+        assert (not plan.missing_required_slots) == feasible, graph

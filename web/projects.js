@@ -33,6 +33,7 @@ async function selectProject(id) {
   if (selectedProjectId !== id) {
     if(typeof clearStoryboards==='function')clearStoryboards();
     if(typeof clearShotMatching==='function')clearShotMatching();
+    if(typeof clearAiProduction==='function')clearAiProduction();
     if(typeof clearWorkCenter==='function')clearWorkCenter();
     if(typeof clearBilling==='function')clearBilling();
     workspaceState.artifactViewGeneration = (workspaceState.artifactViewGeneration || 0) + 1;

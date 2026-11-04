@@ -1,18 +1,20 @@
 # Video AI Studio
 
-P0 控制面与媒体工作流基础：多租户项目、素材、模板、Canonical Timeline、作业、Artifact 和授权记录。
+使用外部托管媒体 API 的视频生产工作台：网页与微信小程序共享项目、素材、分镜、Canonical Timeline、任务、预算、审核和交付。
 
 下一阶段的模块实现方法、目标效果、界面呈现、验收标准和交付顺序见 [详细设计与交付方案](docs/detailed-design.md)。该方案区分现有实现与待建设计，不代表所有目标能力已经完成。
 
 参考流程与产品页面后的双端功能、微信小程序独立工作台、批量生产及实施增量见 [综合产品方案](docs/integrated-product-design.md)。小程序与网页用户功能对等，按终端调整交互，并同步验收。
 
-具体任务、优先级、依赖和阶段验收见 [开发任务与推进路线](docs/development-roadmap.md)；可用于启动完整项目实施的目标文本见 [项目 Goal](docs/project-goal.md)。
+2026-11-04 更新的[项目开发规划](docs/development-roadmap.md)保留 A–H 共 59 项任务和 M0–M5，按 R01–R12 安排恢复增量、词级分析、双端编辑、真实渲染与批量、配音、参考分镜、缺镜头生成和生产交付。开源项目的具体采用方式、源码入口和许可见[参考项目实施映射](docs/open-source-reference-plan.md)；实施约束见[项目目标与执行简报](docs/project-goal.md)。
 
-当前实施状态与阶段验收记录见 [执行进度](docs/development-progress.md)。
+当前实施状态与阶段验收记录见 [执行进度](docs/development-progress.md)；补镜头、人物/纯脸替换和真实样例边界见 [AI制作说明](docs/ai-production.md)。
+
+已发现问题、关闭条件及六个工作包的对应关系见[质量与多场景问题清单](docs/quality-issue-register.md)。
 
 开发环境建议使用 Python 3.13：先创建 `.venv`，再执行 `python -m pip install -c requirements-dev.lock -e '.[dev,gateway,ice,fc]'`。Windows 可使用 `.venv/Scripts/python.exe`，其他平台使用 `.venv/bin/python`。`npm run dev` 自动优先使用该虚拟环境，在 `http://127.0.0.1:4173` 同时提供工作台和 `/api/v1`。仅三个工作台静态文件可公开访问，仓库目录不会被作为文件服务器暴露。
 
-M1 正在实现的网页/小程序共用直传、OSS 网关和服务端完整性核验见[存储网关](docs/storage-gateway.md)，真实分析与外部镜头函数见[云端分析接入](docs/hosted-analysis.md)。OSS、ICE 和限定角色已配置；函数计算权限与应用部署仍待完成，不能把网关代码或存活探针当作真实媒体验收完成。
+仓库记录中 M0 已验收、M1 指定样本的受限真实成片链路已通过；M2 双端与批量源码已广泛接入、M3 参考分镜部分实现，整体及新增媒体效果/微信真机验收仍待完成。2026-11-04 核对发现旧 ECS 项目已退役，当前未重新部署；0008–0023 没有本轮部署证明。直传与核验见[存储网关](docs/storage-gateway.md)，真实分析与外部镜头函数见[云端分析接入](docs/hosted-analysis.md)；实际环境和证据以[执行进度](docs/development-progress.md)及实施时核对结果为准。
 
 当前已具备：上传会话与开发环境内容上传、远端素材 URI 注册、素材分析作业、时间线 schema 校验、Draft/Final 渲染作业、可解释自动剪辑计划器、自动剪辑 Timeline 编译与预览/导出任务、Provider Gateway、持久化 JobStep/幂等键/状态机、声音/Avatar 授权资产和撤销接口、Artifact provenance manifest。
 

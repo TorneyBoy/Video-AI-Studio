@@ -193,7 +193,7 @@ def _capabilities(data: Any, provider: str) -> tuple[ProviderCapability, ...]:
         known = {
             "media_analysis", "shot_analysis", "transcription", "translation",
             "voice_tts", "voice_clone", "voice_conversion", "video_generation",
-            "video_editing", "motion_transfer", "face_transform", "lip_sync", "enhancement",
+            "video_editing", "motion_transfer", "face_transform", "person_replacement", "lip_sync", "enhancement",
         }
         if name not in known:
             raise ProviderRegistryError(f"unknown provider capability: {name}")

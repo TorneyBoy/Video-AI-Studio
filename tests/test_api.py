@@ -36,7 +36,7 @@ def test_health_and_tenant_scoped_project(client: TestClient):
     assert client.get('/healthz').json()['status'] == 'ok'
     ready = client.get('/readyz')
     assert ready.status_code == 200
-    assert ready.json()['checks'] == {'database': 'ok', 'storage': 'ok'}
+    assert ready.json()['checks'] == {'database': 'ok', 'storage': 'ok', 'recovery': 'ok'}
     tenant = client.post('/api/v1/tenants', json={'slug': 'studio', 'name': 'Studio'}).json()
     headers = {'X-Tenant-ID': tenant['id']}
     project = client.post('/api/v1/projects', headers=headers, json={'name': 'Launch'}).json()

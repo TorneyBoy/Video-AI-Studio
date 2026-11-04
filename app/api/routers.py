@@ -853,6 +853,8 @@ def _render_timeline_job(
             raise EditingError("edit_required_slots_missing", "必需镜头尚未补齐，请补充素材并调整计划后再渲染", 422,
                                {"missing_slots": missing})
     canonical = CanonicalTimeline.model_validate(frozen_row.timeline_json) if frozen_row else _canonical_timeline(row)
+    from ..services.derived_rights import assert_timeline_rights
+    derived_rights = assert_timeline_rights(db, tenant_id=tenant_id, project_id=row.project_id, timeline=canonical)
     report = validate_timeline(canonical)
     if not report.valid:
         raise HTTPException(status_code=422, detail=report.as_dict())
@@ -868,6 +870,7 @@ def _render_timeline_job(
         idempotency_key=key,
         max_attempts=payload.max_attempts,
         payload={"manifest": manifest.model_dump(mode="json"), "manifest_id": manifest.manifest_id,
+                 "derived_rights": derived_rights,
                  "render_request_hash": request_hash, **binding, **({"quote_id": quote_id} if quote_id else {}),
                  **({"capability_snapshot": chosen_capability} if chosen_capability else {})},
     )
@@ -1065,14 +1068,17 @@ def create_auto_edit_job(
     try:
         from timeline_engine import TemplateDefinition
         template_definition = TemplateDefinition.model_validate(template.content)
+        from ..services.scenario_profiles import freeze_template_scenario
+        template_definition = freeze_template_scenario(template_definition)
         if payload.target_duration is not None:
             template_definition.duration = payload.target_duration
         if payload.aspect_ratio is not None:
             template_definition.metadata = {**template_definition.metadata, "resolution": {
                 "9:16": {"width": 1080, "height": 1920}, "16:9": {"width": 1920, "height": 1080},
                 "1:1": {"width": 1080, "height": 1080}}[payload.aspect_ratio]}
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail={"code": "invalid_template", "errors": exc.errors()}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "invalid_template", "errors": exc.errors() if isinstance(exc, ValidationError) else [],
+                                                    "message": "模板或场景版本无效，请重新选择"}) from exc
 
     stmt = select(models.Asset).where(models.Asset.tenant_id == tenant_id, models.Asset.project_id == project.id)
     if payload.asset_ids:
@@ -1147,7 +1153,8 @@ def create_auto_edit_job(
             db.flush()
             _preflight_job_budget(db, analysis_job)
         analysis_job_ids.append(analysis_job.id)
-    features = shot_features_from_assets(assets)
+    from ..services.scenario_profiles import template_scenario
+    features = shot_features_from_assets(assets, scenario=template_scenario(template_definition))
     plan = AutoEditPlanner().plan(template_definition, features)
     row = models.Job(
         tenant_id=tenant_id,
@@ -1167,6 +1174,7 @@ def create_auto_edit_job(
             "plan": {
                 "template_id": plan.template_id,
                 "template_version": plan.template_version,
+                **({"scenario": plan.scenario} if plan.scenario else {}),
                 "selected": [shot.__dict__ for shot in plan.selected],
                 "warnings": list(plan.warnings),
                 "missing_required_slots": list(plan.missing_required_slots),

@@ -52,8 +52,8 @@ def asset_access(asset_id: str, tenant: str = Depends(require_tenant_id), db: Se
     asset = service.asset_for(db, tenant, asset_id)
     if not service.ready(asset) or not asset.kind.startswith(("video", "image")):
         raise EditingError("matching_asset_not_ready", "请先完成图片或视频的上传核验")
-    value = gateway.artifact_access(artifact_id=asset.id, tenant_id=tenant, object_uri=asset.uri,
-                                    purpose="playback", ttl_seconds=300)
+    from ..services.derived_rights import asset_playback
+    value = asset_playback(db, asset, tenant_id=tenant, gateway=gateway)
     return {"url": value["url"], "expires_at": value["expires_at"]}
 
 

@@ -12,6 +12,7 @@
     "clip-editor.js",
     "subtitle-editor.js",
     "layer-editor.js",
+    "scenario-review-form.js",
     "reviews.js",
     "delivery.js",
     "billing.js",
@@ -24,6 +25,8 @@
     "storyboards.js",
     "shot-matching-form.js",
     "shot-matching.js",
+    "ai-tools-form.js",
+    "ai-tools.js",
     "account.js"
   ]
 }

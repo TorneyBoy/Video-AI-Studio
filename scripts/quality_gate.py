@@ -158,6 +158,7 @@ def run_fast(*, root: Path, env: dict[str, str], skip_console: bool = False, inc
         results.append(run_command("console-upload-recovery", [node, "tests/frontend_upload.cjs"], root=root, env=env))
         results.append(run_command("console-editor-recovery", [node, "tests/frontend_editor.cjs"], root=root, env=env))
         results.append(run_command("console-review-recovery", [node, "tests/frontend_reviews.cjs"], root=root, env=env))
+        results.append(run_command("mini-review-recovery", [node, "tests/miniprogram_review.cjs"], root=root, env=env))
         results.append(run_command("console-delivery-recovery", [node, "tests/frontend_delivery.cjs"], root=root, env=env))
         results.append(run_command("console-billing-recovery", [node, "tests/frontend_billing.cjs"], root=root, env=env))
         results.append(run_command("console-preparation-recovery", [node, "tests/frontend_preparation.cjs"], root=root, env=env))
@@ -166,6 +167,8 @@ def run_fast(*, root: Path, env: dict[str, str], skip_console: bool = False, inc
         results.append(run_command("console-batch-delivery", [node, "tests/frontend_batch_delivery.cjs"], root=root, env=env))
         results.append(run_command("console-storyboards", [node, "tests/frontend_storyboards.cjs"], root=root, env=env))
         results.append(run_command("console-shot-matching", [node, "tests/frontend_shot_matching.cjs"], root=root, env=env))
+        results.append(run_command("console-ai-tools", [node, "tests/frontend_ai_tools.cjs"], root=root, env=env))
+        results.append(run_command("mini-ai-tools", [node, "tests/miniprogram_ai_tools.cjs"], root=root, env=env))
     return results
 
 

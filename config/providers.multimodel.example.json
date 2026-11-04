@@ -1,0 +1,178 @@
+{
+  "template_only": true,
+  "notes": [
+    "Two normalized HTTP gateway contracts for the same text-to-video input task. No native vendor endpoint or live qualification is claimed.",
+    "Endpoints and model identities are examples; disabled, draft, unverified and unpriced. Do not enable without real adapters, commercial approval, model-specific media acceptance and confirmed price.",
+    "Scenario profiles are draft; this example contains no verified scene scores or automatic quality ranking.",
+    "The worker sends frozen provider_parameters once; the remote gateway must implement the declared mapping."
+  ],
+  "providers": [
+    {
+      "name": "example-gateway-a",
+      "kind": "http",
+      "enabled": false,
+      "endpoint": "https://gateway-a.example.invalid",
+      "path": "/v1/generate",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "headers_env": {
+        "Authorization": "EXAMPLE_GATEWAY_A_AUTHORIZATION"
+      },
+      "model": {
+        "provider": "example-gateway-a",
+        "model_id": "example-text-video-a",
+        "version": "example-1",
+        "license_snapshot": {
+          "commercial_allowed": false,
+          "status": "draft",
+          "weights_license": "unknown-requires-operator-review",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "example-only-not-a-vendor-release"
+        }
+      },
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": [
+            "text"
+          ],
+          "output_types": [
+            "video"
+          ],
+          "commercial_allowed": false,
+          "acceptance": {
+            "status": "unverified",
+            "model_version": "example-1"
+          },
+          "limits": {
+            "max_output_duration_seconds": 10,
+            "min_reference_inputs": 0,
+            "max_reference_inputs": 0,
+            "max_prompt_chars": 20000,
+            "request_contract": {
+              "schema_version": "ai-request-contract/1",
+              "id": "example-gateway-a-text-video",
+              "version": "1",
+              "operations": [
+                "video_generation"
+              ],
+              "input_mode": "text",
+              "prompt_version": "example-text-shot-1",
+              "prompt_template": "{scenario}\n{prompt}",
+              "parameters": {
+                "duration": {
+                  "type": "number",
+                  "minimum": 2,
+                  "maximum": 10,
+                  "required": true
+                },
+                "resolution": {
+                  "type": "string",
+                  "enum": [
+                    "720P"
+                  ],
+                  "default": "720P"
+                },
+                "guidance": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "default": 5
+                }
+              },
+              "parameter_mapping": {
+                "guidance": "cfg_scale"
+              },
+              "output_short_edges": {
+                "720P": 720
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "example-gateway-b",
+      "kind": "http",
+      "enabled": false,
+      "endpoint": "https://gateway-b.example.invalid",
+      "path": "/v1/generate",
+      "poll_path": "/v1/jobs/{provider_job_id}",
+      "headers_env": {
+        "Authorization": "EXAMPLE_GATEWAY_B_AUTHORIZATION"
+      },
+      "model": {
+        "provider": "example-gateway-b",
+        "model_id": "example-text-video-b",
+        "version": "example-1",
+        "license_snapshot": {
+          "commercial_allowed": false,
+          "status": "draft",
+          "weights_license": "unknown-requires-operator-review",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "example-only-not-a-vendor-release"
+        }
+      },
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": [
+            "text"
+          ],
+          "output_types": [
+            "video"
+          ],
+          "commercial_allowed": false,
+          "acceptance": {
+            "status": "unverified",
+            "model_version": "example-1"
+          },
+          "limits": {
+            "max_output_duration_seconds": 10,
+            "min_reference_inputs": 0,
+            "max_reference_inputs": 0,
+            "max_prompt_chars": 20000,
+            "request_contract": {
+              "schema_version": "ai-request-contract/1",
+              "id": "example-gateway-b-text-video",
+              "version": "1",
+              "operations": [
+                "video_generation"
+              ],
+              "input_mode": "text",
+              "prompt_version": "example-b-shot-1",
+              "prompt_template": "Shot: {prompt}\nConstraints: {scenario}",
+              "parameters": {
+                "duration": {
+                  "type": "number",
+                  "minimum": 2,
+                  "maximum": 10,
+                  "required": true
+                },
+                "resolution": {
+                  "type": "string",
+                  "enum": [
+                    "720P"
+                  ],
+                  "default": "720P"
+                },
+                "guidance": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "default": 5
+                }
+              },
+              "parameter_mapping": {
+                "duration": "clip_seconds",
+                "guidance": "conditioning_scale"
+              },
+              "output_short_edges": {
+                "720P": 720
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

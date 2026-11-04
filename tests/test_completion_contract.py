@@ -18,6 +18,7 @@ from app.services.completion import (
 from app.services.jobs import claim_job
 from app.services.model_registry import ModelRegistry, ModelVersion
 from app.services.provider_callbacks import ProviderCallbackError, apply_callback
+from app.services.provider_adapters import HTTPProvider
 from app.services.providers import ModelSnapshot, ProviderCapability, ProviderExecutionError, ProviderResult, ProviderRouter
 from app.services.worker import process_queued_provider_jobs
 from app.services.workflows import claim_workflow, create_workflow, recover_expired_workflows
@@ -131,6 +132,54 @@ def test_unknown_cost_is_not_a_free_settlement(database):
         assert ledger.status == "pending_reconciliation"
         assert ledger.amount_micros == 500000
         assert db.scalar(select(models.UsageEvidence)).amount_micros is None
+
+
+@pytest.mark.parametrize("cost", [{"amount": 0.7, "currency": "USD"},
+                                  {"status": "unknown", "currency": "CNY", "bill_confirmed": False}, None])
+def test_http_failure_accounts_observed_charge_and_holds_unknown_reservation(database, cost):
+    import json
+
+    factory, job_id = database
+    calls = []
+
+    def transport(http_request, _timeout):
+        calls.append(http_request.method)
+        if http_request.method == "POST":
+            return 202, b'{"provider_job_id":"gateway-operation","status":"queued"}'
+        body = {"provider_job_id": "gateway-operation", "status": "failed", "retryable": False,
+                "usage": {"output_seconds": 5}, "metrics": {"cloud_job_id": "paid-cloud-task"},
+                "error": {"code": "wan_result_verification_failed"}}
+        if cost is not None:
+            body["cost"] = cost
+        return 200, json.dumps(body).encode()
+
+    provider = HTTPProvider(name="race-provider", base_url="https://gateway.example", capabilities=(
+        ProviderCapability("video_generation", ("json",), ("video",), commercial_allowed=True),),
+        model=ModelSnapshot(provider="race-provider", model_id="wan2.2-t2v-plus", version="wan2.2"),
+        poll_path="/v1/wan/jobs/{provider_job_id}", transport=transport)
+    with factory() as db:
+        job = db.get(models.Job, job_id)
+        job.payload = {**job.payload, "estimated_cost": {"amount": 0.5, "currency": "USD"}}
+        assert preflight_job_budget(db, job).allowed
+        db.commit()
+        assert process_queued_provider_jobs(db, router=ProviderRouter([provider]))[0]["status"] == "failed"
+    with factory() as db:
+        job = db.get(models.Job, job_id)
+        assert job.failure_code == "wan_result_verification_failed" and not job.retryable
+        assert db.scalar(select(models.ProviderOperation)).external_job_id == "gateway-operation"
+        ledger = db.scalar(select(models.UsageLedger))
+        evidence = db.scalar(select(models.UsageEvidence))
+        assert ledger.usage_json == evidence.usage_json == {"output_seconds": 5}
+        assert ledger.cost_json == evidence.cost_json == (cost or {})
+        if cost and "amount" in cost:
+            assert ledger.status == "settled" and ledger.amount_micros == evidence.amount_micros == 700000
+        else:
+            assert ledger.status == "pending_reconciliation" and ledger.amount_micros == 500000
+            assert evidence.amount_micros is None
+            assert budget_snapshot(db, None, job.tenant_id)["reserved_micros"] == 500000
+        assert db.scalar(select(func.count()).select_from(models.Artifact)) == 0
+        assert process_queued_provider_jobs(db, router=ProviderRouter([provider])) == []
+        assert calls == ["POST", "GET"]
 
 
 def test_event_identity_survives_later_events_and_rejects_changed_content(database):

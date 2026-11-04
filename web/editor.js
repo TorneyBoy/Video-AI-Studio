@@ -176,6 +176,7 @@ async function handleTrackedResult(record, result) {
 }
 async function submitTrackedOperation(record, repeat = false) {
   if (planEditor.busy) throw new Error('请等待本次操作完成');
+  if (!repeat && typeof pendingAiProduction==='function' && pendingAiProduction()) throw new Error('请先到 AI 制作核对原提交');
   if (!repeat && (typeof pendingBatchRun==='function' && pendingBatchRun() || typeof pendingBatchDelivery==='function' && pendingBatchDelivery())) throw new Error('请先在批次生成页面核对原提交');
   if (!repeat && pendingOperations().length) throw new Error('请先核对上次提交');
   record = {...record, context: record.context || editorContext(), createdAt: record.createdAt || Date.now()};

@@ -163,7 +163,8 @@ def test_one_available_service_must_cover_every_effect_and_receipt_survives_with
     entries = [{**base, 'limits': {'features': ['audio_tracks']}}, {**base, 'id': 'second', 'limits': {'features': ['audio_fades']}}]
     monkeypatch.setattr(render_features, 'capability_catalog', lambda: {'capabilities': entries})
     assert not render_features.render_support(timeline(case, added))['supported']
-    entries[:] = [{**base, 'limits': {'features': ['audio_tracks', 'audio_fades']}}]
+    entries[:] = [{**base, 'limits': {'features': ['audio_tracks', 'audio_fades'],
+                                     'feature_combinations': [['audio_tracks', 'audio_fades']]}}]
     result = render(case, added)
     assert result.status_code == 201, result.text
     assert result.json()['job']['payload']['capability_snapshot']['id'] == 'verified'

@@ -34,11 +34,22 @@ def capture_transcript(analysis: dict) -> dict | None:
     transcript = analysis.get("transcription")
     if not isinstance(transcript, dict) or transcript.get("status") not in {"ok", "partial"}:
         return None
+    aligned = transcript.get("words") is not None
+    if aligned:
+        from .analysis_contract import validate_hosted_analysis
+        from .providers import ProviderExecutionError
+        try:
+            transcript = validate_hosted_analysis(analysis, source_uri=analysis["source"]["uri"])["transcription"]
+        except (KeyError, TypeError, ProviderExecutionError) as exc:
+            raise EditingError("subtitle_transcript_invalid", "词级原文未通过来源与时间校验，请检查分析结果", 422) from exc
     segments = transcript.get("segments") or []
     if not isinstance(segments, list) or len(segments) > 20000:
         raise EditingError("subtitle_transcript_invalid", "识别原文格式无效，请保留原分析并检查来源", 422)
     result = {key: deepcopy(transcript.get(key)) for key in ("status", "provider", "version", "language")}
-    result["schema_version"] = "transcript/1"
+    result["schema_version"] = "transcript/2" if aligned else "transcript/1"
+    if aligned:
+        result["words"] = deepcopy(transcript["words"])
+        result["word_alignment"] = deepcopy(transcript["word_alignment"])
     result["segments"] = []
     for index, row in enumerate(segments):
         try:
@@ -48,7 +59,9 @@ def capture_transcript(analysis: dict) -> dict | None:
             _text(text)
         except (KeyError, TypeError, ValueError) as exc:
             raise EditingError("subtitle_transcript_invalid", "识别原文含无效时间或文字，请检查分析结果", 422) from exc
-        result["segments"].append({"id": f"segment-{index}", "start": start, "end": end, "text": text})
+        result["segments"].append({"id": row.get("id", f"segment-{index}") if aligned else f"segment-{index}",
+            "start": start, "end": end, "text": text,
+            **({key: row[key] for key in ("speaker_id", "boundary_safe") if key in row} if aligned else {})})
     result["hash"] = _hash(result)
     return result
 

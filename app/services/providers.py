@@ -31,7 +31,7 @@ Capability = Literal[
     "video_generation",
     "video_editing",
     "motion_transfer",
-    "face_transform",
+    "face_transform", "person_replacement",
     "lip_sync",
     "enhancement",
 ]

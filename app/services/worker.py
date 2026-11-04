@@ -599,7 +599,7 @@ def process_queued_auto_edit_jobs(db: Session, *, limit: int = 10, _claims=None)
             if not asset_ids:
                 # Older jobs only persisted the planner output. Recover the
                 # source asset IDs from selected shot IDs for compatibility.
-                asset_ids = sorted({str(item.get("asset_id", "")).split("#shot-", 1)[0] for item in payload.get("plan", {}).get("selected", []) if item.get("asset_id")})
+                asset_ids = sorted({str(item.get("asset_id", "")).split("#", 1)[0] for item in payload.get("plan", {}).get("selected", []) if item.get("asset_id")})
             assets = list(
                 db.scalars(
                     select(models.Asset).where(
@@ -627,11 +627,15 @@ def process_queued_auto_edit_jobs(db: Session, *, limit: int = 10, _claims=None)
                     require_planning_analysis((asset.metadata_json or {}).get("analysis") or {},
                                               source_uri=asset.uri, kind=asset.kind)
             if initial_revision is None:
-                fresh_plan = AutoEditPlanner().plan(template, shot_features_from_assets(assets))
+                from .scenario_profiles import freeze_template_scenario, template_scenario
+                template = freeze_template_scenario(template)
+                fresh_plan = AutoEditPlanner().plan(template, shot_features_from_assets(assets, scenario=template_scenario(template)))
                 selected = [shot.__dict__ for shot in fresh_plan.selected]
                 payload["plan"] = {"template_id": fresh_plan.template_id, "template_version": fresh_plan.template_version,
                                    "selected": selected, "warnings": list(fresh_plan.warnings),
                                    "missing_required_slots": list(fresh_plan.missing_required_slots)}
+                if fresh_plan.scenario:
+                    payload["plan"]["scenario"] = fresh_plan.scenario
             else:
                 document = db.get(models.EditDocument, initial_revision.document_id)
                 frozen_timeline = assert_render_sources(db, document, initial_revision)
@@ -800,6 +804,8 @@ def _provider_failure_audit(
 
 def _provider_request(job: models.Job, output_dir: Path, db: Session | None = None) -> ProviderRequest:
     raw = dict(job.payload.get("provider_request") or {})
+    production_snapshot = ((job.payload.get("ai_production") or {}).get("snapshot") or {})
+    frozen_uris = production_snapshot.get("asset_uris") or {}
     capability = raw.pop("capability", None)
     if not capability:
         raise ProviderExecutionError(
@@ -816,6 +822,13 @@ def _provider_request(job: models.Job, output_dir: Path, db: Session | None = No
     model_version = accepted.get("model_version", model_version)
     commercial_use = bool(raw.pop("commercial_use", True))
     options = dict(raw.pop("options", {}) or {})
+    # New model contracts lower parameters exactly once at quotation. Preserve
+    # that frozen request through retries/polls rather than remapping against a
+    # mutable catalogue (or silently reverting to the original user's prompt).
+    if "provider_parameters" in production_snapshot:
+        options = dict(production_snapshot["provider_parameters"])
+    if "execution_prompt" in production_snapshot:
+        raw["prompt"] = production_snapshot["execution_prompt"]
     # Fields that are policy inputs belong in the request inputs so the
     # adapter and audit trail can both observe them.  Options are model
     # tuning knobs and are kept separate from identity/rights inputs.
@@ -839,6 +852,9 @@ def _provider_request(job: models.Job, output_dir: Path, db: Session | None = No
         for field in ("asset_id", "source_asset_id", "audio_asset_id"):
             asset_id = raw.get(field)
             if not asset_id:
+                continue
+            if asset_id in frozen_uris:
+                raw[f"{field.removesuffix('_id')}_uri"] = _remote_asset_uri(frozen_uris[asset_id], capability=capability, field=field)
                 continue
             asset = db.scalar(select(models.Asset).where(models.Asset.id == str(asset_id), models.Asset.tenant_id == job.tenant_id))
             if asset is None:
@@ -879,12 +895,12 @@ def _provider_request(job: models.Job, output_dir: Path, db: Session | None = No
             if _api_only_media_execution():
                 raw["reference_asset_uris"] = [
                     _remote_asset_uri(
-                        by_id[str(asset_id)].uri,
+                        frozen_uris[str(asset_id)] if str(asset_id) in frozen_uris else by_id[str(asset_id)].uri,
                         capability=capability,
                         field=f"reference_asset_uris[{index}]",
                     )
                     for index, asset_id in enumerate(reference_ids)
-                    if str(asset_id) in by_id
+                    if str(asset_id) in by_id or str(asset_id) in frozen_uris
                 ]
         extension = ".wav" if capability.startswith("voice_") else ".mp4"
         options.setdefault("output_path", str(output_dir / f"output{extension}"))
@@ -910,6 +926,17 @@ def _validate_provider_policy(db: Session, job: models.Job, request: ProviderReq
     be revoked while a job is queued.  The worker therefore performs the
     final check and emits a non-retryable, auditable policy failure.
     """
+    # Revocation forbids new spending and adoption, but a paid original task
+    # must remain queryable so its outcome and invoice can be reconciled.
+    if job.payload.get("ai_production"):
+        operation = db.scalar(select(models.ProviderOperation).where(models.ProviderOperation.job_id == job.id))
+        if operation and operation.external_job_id:
+            return
+    from .ai_production import validate_dispatch
+    try:
+        validate_dispatch(db, job)
+    except EditingError as exc:
+        raise ProviderExecutionError(str(exc), code=exc.code, capability=request.capability, retryable=False) from exc
     if request.capability == "enhancement" and not request.inputs.get("rights_confirmed"):
         raise ProviderExecutionError(
             "rights confirmation is required for enhancement",
@@ -925,6 +952,7 @@ def _validate_provider_policy(db: Session, job: models.Job, request: ProviderReq
         "voice_conversion": {"voice", "voice_conversion"},
         "motion_transfer": {"face", "avatar", "motion_transfer"},
         "face_transform": {"face", "avatar", "face_replace"},
+        "person_replacement": {"face", "avatar", "person_replace"},
         "lip_sync": {"face", "avatar", "lip_sync"},
     }
     required_scopes = scope_by_capability.get(request.capability, set())
@@ -1176,7 +1204,13 @@ def process_queued_render_jobs(
             if not manifest.verify_hash():
                 raise ValueError("render manifest content_hash verification failed")
             try:
-                validate_render_revision(db, job, manifest)
+                remote_operation = db.scalar(select(models.ProviderOperation).where(models.ProviderOperation.job_id == job.id))
+                recovering_render = bool((job.payload or {}).get("provider_job_id") or
+                                         (remote_operation and remote_operation.external_job_id))
+                validate_render_revision(db, job, manifest, check_sources=not recovering_render)
+                if not recovering_render:
+                    from .derived_rights import assert_job_rights
+                    assert_job_rights(db, job)
             except EditingError as exc:
                 raise ProviderExecutionError(str(exc), code=exc.code, capability="video_editing", retryable=False) from exc
             timeline = Timeline.model_validate(manifest.source["timeline"])

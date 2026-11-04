@@ -33,6 +33,8 @@ def quote_context(db: Session,row: models.Timeline,tenant: str,payload: schemas.
     try:canonical=Timeline.model_validate(frozen.timeline_json if frozen else row.timeline_json)
     except ValueError as exc:raise EditingError('quote_timeline_invalid','时间线尚未通过校验，请先保存有效版本',422) from exc
     if not validate_timeline(canonical).valid:raise EditingError('quote_timeline_invalid','时间线尚未通过校验，请先保存有效版本',422)
+    from .derived_rights import assert_timeline_rights
+    assert_timeline_rights(db,tenant_id=tenant,project_id=row.project_id,timeline=canonical)
     selected=require_render_support(canonical.model_dump(mode='json'),require_price=True)
     if not selected:raise EditingError('quote_price_unavailable','当前服务未提供已验收且带版本的报价，不能按零费用提交',422)
     limits=selected.get('limits') or {};bound=limits.get('max_output_duration_seconds') or limits.get('max_duration_seconds')

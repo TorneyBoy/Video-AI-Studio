@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .database import SessionLocal, get_db, init_db
 from .services.observability import prometheus_job_metrics
+from .api.ai_production import router as ai_production_router
+from .api.project_quality import router as project_quality_router
 from .api.routers import router
 from .api.billing import router as billing_router
 from .api.preparation import router as preparation_router
@@ -63,6 +65,8 @@ app.include_router(batch_runs_router, prefix=settings.api_prefix)
 app.include_router(batch_delivery_router, prefix=settings.api_prefix)
 app.include_router(identity_router, prefix=settings.api_prefix)
 app.include_router(operations_router)
+app.include_router(ai_production_router, prefix=settings.api_prefix)
+app.include_router(project_quality_router, prefix=settings.api_prefix)
 app.add_middleware(RequestObservation)
 
 
@@ -161,7 +165,7 @@ def console_script():
     return FileResponse(Path(__file__).resolve().parent.parent / "app.js", media_type="text/javascript", headers={"Cache-Control": "no-cache"})
 
 
-CONSOLE_SCRIPTS = frozenset({"state.js", "network.js", "projects.js", "tasks.js", "assets.js", "workspace.js", "editor.js", "clip-editor.js", "subtitle-editor.js", "layer-editor.js", "reviews.js", "delivery.js", "billing.js", "preparation.js", "batch-form.js", "batches.js", "batch-runs.js", "batch-delivery.js", "account.js", "uploads.js", "vendor-sha256.js", "storyboard-form.js", "storyboards.js", "shot-matching-form.js", "shot-matching.js"})
+CONSOLE_SCRIPTS = frozenset({"ai-tools-form.js", "ai-tools.js", "state.js", "network.js", "projects.js", "tasks.js", "assets.js", "workspace.js", "editor.js", "clip-editor.js", "subtitle-editor.js", "layer-editor.js", "reviews.js", "delivery.js", "billing.js", "preparation.js", "batch-form.js", "batches.js", "batch-runs.js", "batch-delivery.js", "account.js", "uploads.js", "vendor-sha256.js", "storyboard-form.js", "storyboards.js", "shot-matching-form.js", "shot-matching.js"})
 
 
 @app.get("/web/{file_name}", include_in_schema=False)

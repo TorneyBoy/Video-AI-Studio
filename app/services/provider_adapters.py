@@ -246,7 +246,40 @@ class HTTPProvider:
         provider_job_id: str | None = None,
     ) -> ProviderResult | None:
         artifact_uri = response.get("artifact_uri") or response.get("output_uri")
-        state = str(response.get("status") or "").lower()
+        state = str(response.get("status") or "").strip().lower()
+        provider_job_id = provider_job_id or self._provider_job_id(response)
+        if state in {"failed", "error", "cancelled", "canceled"}:
+            error_data = response.get("error") if isinstance(response.get("error"), dict) else {}
+            error = ProviderExecutionError(
+                str(error_data.get("message") or response.get("message") or "provider job failed"),
+                code=str(error_data.get("code") or "provider_job_failed"),
+                provider=self.name,
+                capability=request.capability,
+                retryable=bool(response.get("retryable", False)),
+                details={"provider_job_id": provider_job_id, "provider_status": state},
+            )
+            provenance = {"provider_request_id": response.get("request_id") or request.request_id}
+            if provider_job_id:
+                provenance["provider_job_id"] = provider_job_id
+            # Failure does not mean free: QC/import can fail after paid work.
+            # Keep charge evidence for the worker's failed-result transaction,
+            # but never expose a rejected URI as a deliverable. An absent cost
+            # stays unknown so the existing reservation remains held.
+            error.rejected_result = ProviderResult(
+                artifact_uri="",
+                artifact_type="provider.failed",
+                model=self.model or ModelSnapshot(
+                    provider=self.name,
+                    model_id=request.model_id or "unknown",
+                    version=request.model_version or "unknown",
+                ),
+                status="failed",
+                provenance=provenance,
+                metrics=_redact(response["metrics"]) if isinstance(response.get("metrics"), dict) else {},
+                usage=_redact(response["usage"]) if isinstance(response.get("usage"), dict) else {},
+                cost=_redact(response["cost"]) if isinstance(response.get("cost"), dict) else {},
+            )
+            raise error
         if artifact_uri:
             if not isinstance(artifact_uri, str):
                 raise ProviderExecutionError(
@@ -299,16 +332,6 @@ class HTTPProvider:
                 usage=response.get("usage") if isinstance(response.get("usage"), dict) else {},
                 cost=response.get("cost") if isinstance(response.get("cost"), dict) else {},
             )
-        if state in {"failed", "error", "cancelled", "canceled"}:
-            error_data = response.get("error") if isinstance(response.get("error"), dict) else {}
-            raise ProviderExecutionError(
-                str(error_data.get("message") or response.get("message") or "provider job failed"),
-                code=str(error_data.get("code") or "provider_job_failed"),
-                provider=self.name,
-                capability=request.capability,
-                retryable=bool(response.get("retryable", False)),
-                details={"provider_job_id": provider_job_id, "provider_status": state},
-            )
         return None
 
     @staticmethod
@@ -337,14 +360,21 @@ class HTTPProvider:
                 method="GET",
                 headers={**self.headers, "X-Request-ID": request.request_id},
             )
-            status, raw = self._send(
-                poll_request,
-                min(self.timeout_seconds, max(0.1, self.poll_timeout_seconds)),
-            )
-            if status < 200 or status >= 300:
-                raise self._status_error(status, request.capability)
-            response = _json_body(raw, provider=self.name, capability=request.capability)
-            result = self._result_from_response(response, request, provider_job_id=provider_job_id)
+            try:
+                status, raw = self._send(
+                    poll_request,
+                    min(self.timeout_seconds, max(0.1, self.poll_timeout_seconds)),
+                )
+                if status < 200 or status >= 300:
+                    raise self._status_error(status, request.capability)
+                response = _json_body(raw, provider=self.name, capability=request.capability)
+                result = self._result_from_response(response, request, provider_job_id=provider_job_id)
+            except ProviderExecutionError as exc:
+                # Submission already returned this durable identity. A poll
+                # timeout or malformed response must never turn it back into
+                # an unknown POST or cause a replacement paid submission.
+                exc.details = {**exc.details, "provider_job_id": provider_job_id}
+                raise
             if result is not None:
                 return result
             provider_status = str(response.get("status") or "processing").lower()

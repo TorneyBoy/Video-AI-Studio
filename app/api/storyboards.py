@@ -78,8 +78,8 @@ def reference_access(reference_id: str, tenant: str = Depends(require_tenant_id)
     if service.source_hash(asset) != row.source_hash:
         raise EditingError("reference_source_changed", "素材对象已变化；请为当前对象重新登记参考")
     # The storage service signs only its tenant-scoped object. No new AI job.
-    grant = gateway.artifact_access(artifact_id=asset.id, tenant_id=tenant, object_uri=asset.uri,
-                                    purpose="playback", ttl_seconds=300)
+    from ..services.derived_rights import asset_playback
+    grant = asset_playback(db, asset, tenant_id=tenant, gateway=gateway, expected_source_hash=row.source_hash)
     return {"url": grant["url"], "expires_at": grant["expires_at"]}
 
 

@@ -15,11 +15,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column
 from timeline_engine import RenderManifest, Timeline, validate_timeline
 
-from app.services.media_quality import validate_render_quality
+from app.services.media_quality import assess_render_quality, assert_renderer_quality, renderer_findings, validate_render_quality
+from app.services.render_features import advanced_features
 from app.services.providers import ProviderExecutionError
 from .database import Base
 from .ice_client import API_VERSION, SDK_VERSION, ICEAPIError, ICEClient
-from .ice_timeline import compile_ice_timeline, oss_media_url
+from .ice_timeline import COMPILER_VERSION, OPTIONAL_FEATURES, compile_ice_timeline, oss_media_url
 from .oss import ObjectStoreError
 from .model_identity import registered_result
 
@@ -102,7 +103,10 @@ def register_render_routes(app, *, settings, sessions, store, authorize, ice_cli
     @app.get("/v1/render/health", dependencies=[Depends(authorize)])
     def health():
         return {"status": "ok", "available": settings.ice_render_enabled, "cloud_verified": False,
-                "service_api_version": API_VERSION, "compiler_version": "initial-v3-accepted-subset"}
+                "service_api_version": API_VERSION, "compiler_version": COMPILER_VERSION,
+                "enabled_features": settings.ice_render_features, "compiler_features": sorted(OPTIONAL_FEATURES),
+                "quality_scope": "structural_probe",
+                "blocked_execution_constraints": ["ice_image_end_unverified"]}
 
     @app.post("/v1/render", dependencies=[Depends(authorize)])
     def submit(payload: RenderRequest, request_id: str = Header(alias="X-Request-ID"),
@@ -144,7 +148,8 @@ def register_render_routes(app, *, settings, sessions, store, authorize, ice_cli
                 store.key_from_uri(asset.uri, payload.tenant_id)
             if timeline.duration > settings.ice_render_max_duration_seconds or min(timeline.resolution.width, timeline.resolution.height) > 1080:
                 raise ValueError("render exceeds the configured trial limits")
-            cloud_timeline, output = compile_ice_timeline(timeline, bucket=settings.oss_bucket, region=settings.oss_region)
+            cloud_timeline, output = compile_ice_timeline(timeline, bucket=settings.oss_bucket, region=settings.oss_region,
+                                                        enabled_features=settings.ice_render_features)
         except (ValueError, KeyError, TypeError) as exc:
             raise ObjectStoreError("render_input_unsupported", "Render input does not satisfy the supported cloud profile", 422) from exc
         token = hashlib.sha256(f"{payload.tenant_id}\n{request_id}".encode()).hexdigest()
@@ -154,12 +159,20 @@ def register_render_routes(app, *, settings, sessions, store, authorize, ice_cli
         specification = {"timeline": timeline.model_dump(mode="json"), "cloud_timeline": cloud_timeline,
                          "output": output, "manifest_hash": manifest.content_hash}
         digest = hashlib.sha256(json.dumps(specification, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        # Metadata is frozen on first creation but excluded from the historical
+        # request digest, so replaying an accepted M1 operation remains valid.
+        specification["compiler_version"] = COMPILER_VERSION
+        specification["optional_features"] = sorted(set(advanced_features(specification["timeline"])) & OPTIONAL_FEATURES)
         with sessions() as db:
             existing = db.get(RenderOperation, token)
             if existing:
                 if existing.request_hash != digest:
                     raise ObjectStoreError("render_idempotency_conflict", "Render identity is bound to different input", 409)
                 return response(existing)
+            try:
+                assert_renderer_quality(timeline, renderer_model_id=MODEL_ID)
+            except ProviderExecutionError as exc:
+                raise ObjectStoreError(exc.code, "Renderer cannot satisfy the declared quality contract", 422) from exc
             try:
                 if db.get(RenderQuota, "trial") is None:
                     with db.begin_nested():
@@ -208,6 +221,16 @@ def register_render_routes(app, *, settings, sessions, store, authorize, ice_cli
                 row.status, row.error_code = "failed", "ice_operation_reconciliation_required"
                 db.commit()
                 return response(row)
+            if remote_id is None:
+                try:
+                    # Count only real supplier submissions, not an admission
+                    # failure for a request queued by an earlier release.
+                    assert_renderer_quality(specification["timeline"], renderer_model_id=MODEL_ID)
+                except ProviderExecutionError as exc:
+                    row.status, row.error_code = "failed", exc.code
+                    row.lease_token, row.lease_expires_at = None, None
+                    db.commit()
+                    return response(row)
             row.submit_attempts += 0 if remote_id else 1
             row.polls += 1 if remote_id else 0
             db.commit()
@@ -227,7 +250,9 @@ def register_render_routes(app, *, settings, sessions, store, authorize, ice_cli
                         specification=specification, status=value, request_id=request_id, operation_id=operation_id)
         except ICEAPIError as exc:
             changes.update(status="failed" if exc.submission_rejected or not exc.retryable else "running", error_code=exc.code)
-        except (ObjectStoreError, ProviderExecutionError, ValueError, TypeError, KeyError):
+        except ProviderExecutionError as exc:
+            changes.update(status="failed", error_code=exc.code)
+        except (ObjectStoreError, ValueError, TypeError, KeyError):
             # Remote rendering may already be billable. Preserve its ID for
             # reconciliation and never restart it as a new operation.
             changes.update(status="failed", error_code="ice_result_verification_failed")
@@ -257,6 +282,7 @@ def inspect_render(client, *, store, settings, uri: str, specification: dict, st
         "fps": video.get("frame_rate"), "video_codec": video.get("codec"), "container": facts["container"],
         "has_audio": facts["has_audio"], "inspector": "aliyun-ice-media-info-and-oss-sha256",
         "inspector_version": f"{API_VERSION}/sdk-{SDK_VERSION}/sha256-v1"}
+    assessment = assess_render_quality(report, timeline=timeline, output_uri=uri)
     try:
         report = validate_render_quality(report, timeline=timeline, output_uri=uri)
     except ProviderExecutionError:
@@ -267,11 +293,17 @@ def inspect_render(client, *, store, settings, uri: str, specification: dict, st
         "artifact_uri": uri, "artifact_type": "render",
         "model": {"provider": PROVIDER, "model_id": MODEL_ID, "version": API_VERSION},
         "metrics": {"quality_control": report, "cloud_job_id": status["job_id"],
+                    "render_quality_assessment": assessment,
+                    "renderer_quality_findings": renderer_findings(timeline, renderer_model_id=MODEL_ID),
                     "cloud_request_id": status["request_id"], "probe_request_id": probe["request_id"],
-                    "probe_job_id": probe["job_id"], "manifest_hash": specification["manifest_hash"]},
+                    "probe_job_id": probe["job_id"], "manifest_hash": specification["manifest_hash"],
+                    "compiler_version": specification.get("compiler_version", "initial-v3-accepted-subset"),
+                    "render_features": specification.get("optional_features", [])},
         "usage": {"output_seconds": facts["duration_seconds"]},
-        "cost": calculated_clip_cost(duration=facts["duration_seconds"], width=video.get("width", 0),
-                                     height=video.get("height", 0), region=settings.oss_region)}
+        "cost": ({"status": "unknown", "currency": "CNY", "bill_confirmed": False,
+                  "reason": "advanced_render_tariff_requires_reconciliation"} if specification.get("optional_features") else
+                 calculated_clip_cost(duration=facts["duration_seconds"], width=video.get("width", 0),
+                                      height=video.get("height", 0), region=settings.oss_region))}
 
 
 def specification_tenant(uri: str) -> str:

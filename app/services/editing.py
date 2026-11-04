@@ -103,7 +103,7 @@ def _capture_sources(assets: list[models.Asset]) -> list[dict]:
                     raise EditingError("edit_analysis_required", "请先完成视频镜头分析", 422) from exc
         transcript = capture_transcript(analysis)
         # Keep media/shot facts separate from the immutable ASR original.
-        if isinstance(analysis.get("transcription"), dict):
+        if isinstance(analysis.get("transcription"), dict) and not analysis["transcription"].get("words"):
             analysis["transcription"]["segments"] = []
         sources.append({"id": asset.id, "name": asset.name, "kind": asset.kind, "uri": asset.uri, "transcript": transcript,
             "metadata": {"analysis": analysis, "duration": metadata.get("duration"), "user_tags": deepcopy(metadata.get("user_tags") or []),
@@ -118,11 +118,18 @@ def _source_assets(sources: list[dict]) -> list[SimpleNamespace]:
                             metadata_json=deepcopy(row["metadata"])) for row in sources]
 
 
-def _candidate_map(sources: list[dict], fps: float = 30) -> dict[str, dict]:
+def _candidate_map(sources: list[dict], fps: float = 30, *, scenario=None) -> dict[str, dict]:
     source_map = {row["id"]: row for row in sources}
     result = {}
     clock = FrameClock(fps)
-    for feature in shot_features_from_assets(_source_assets(sources)):
+    if scenario:
+        from .scenario_profiles import resolve_scenario_binding
+        scenario = resolve_scenario_binding(scenario) if isinstance(scenario, dict) else scenario
+    for feature in shot_features_from_assets(_source_assets(sources), scenario=scenario):
+        if scenario:
+            from .auto_edit import scenario_feature_eligibility
+            if not scenario_feature_eligibility(scenario, feature)["eligible"]:
+                continue
         raw = feature.metadata or {}; start = float(raw.get("source_start", raw.get("start", 0)) or 0)
         end = float(raw.get("source_end", raw.get("end", start + feature.duration)) or start + feature.duration)
         try:
@@ -130,8 +137,8 @@ def _candidate_map(sources: list[dict], fps: float = 30) -> dict[str, dict]:
         except ValueError:
             continue
         start, end = clock.seconds(first), clock.seconds(last)
-        score, rationale = AutoEditPlanner().score(feature)
-        source = source_map[feature.asset_id.split("#shot-", 1)[0]]
+        score, rationale = AutoEditPlanner(weights=scenario.selection_weights if scenario else None).score(feature)
+        source = source_map[feature.asset_id.split("#", 1)[0]]
         result[feature.asset_id] = {"candidate_id": feature.asset_id, "source_asset_id": source["id"],
             "name": source["name"], "kind": source["kind"], "source_start": start, "source_end": end,
             "duration": end - start, "orientation": feature.orientation, "metadata": raw,
@@ -152,14 +159,15 @@ def _eligible(candidate: dict, slot, template: TemplateDefinition, duration: flo
 def candidates_read(revision: models.PlanRevision, *, fps: float = 30) -> list[dict]:
     template = TemplateDefinition.model_validate(revision.template_json)
     rows = []
-    for candidate in _candidate_map(revision.sources_json, fps).values():
+    from .scenario_profiles import template_scenario
+    for candidate in _candidate_map(revision.sources_json, fps, scenario=template_scenario(template)).values():
         rows.append({key: deepcopy(value) for key, value in candidate.items() if key != "metadata"} | {
             "eligible_slots": [slot.name for slot in template.slots if _eligible(candidate, slot, template)]})
     return rows
 
 
 def _plan_rows(document_id: str, timeline: Timeline, plan: dict, sources: list[dict]) -> list[dict]:
-    candidates = _candidate_map(sources, timeline.fps)
+    candidates = _candidate_map(sources, timeline.fps, scenario=timeline.metadata.get("scenario"))
     prior = {(row.get("slot"), row.get("asset_id")): row for row in plan.get("selected", [])}
     by_clip = {row.get("clip_id"): row for row in plan.get("selected", []) if row.get("clip_id")}
     rows = []
@@ -206,17 +214,29 @@ def assert_render_sources(db: Session, document: models.EditDocument, revision: 
     timeline = timeline_for_revision(db, revision)
     used = {asset["id"] for asset in timeline.timeline_json.get("assets", [])}
     _assert_sources_current(db, document, revision.sources_json, used)
+    from .derived_rights import assert_timeline_rights
+    assert_timeline_rights(db, tenant_id=document.tenant_id, project_id=document.project_id, timeline=timeline.timeline_json)
+    _assert_scenario_sources(Timeline.model_validate(timeline.timeline_json), revision.sources_json,
+                             TemplateDefinition.model_validate(revision.template_json))
     return timeline
 
 
-def validate_render_revision(db: Session, job: models.Job, manifest) -> None:
+def _assert_scenario_sources(timeline: Timeline, sources: list[dict], template: TemplateDefinition) -> None:
+    from .auto_edit import assert_scenario_timeline_sources
+    try:
+        assert_scenario_timeline_sources(timeline, _source_assets(sources), template)
+    except ValueError as exc:
+        raise EditingError("edit_scenario_boundary", "修改未满足场景的来源、完整讲话或词级边界要求，请保留完整单元后重试", 422) from exc
+
+
+def validate_render_revision(db: Session, job: models.Job, manifest, *, check_sources: bool = True) -> None:
     payload = job.payload or {}
     revision_id = payload.get("timeline_revision_id")
     if not revision_id:
         return  # Legacy M1 renders keep their original manifest-only contract.
     document = document_for_tenant(db, job.tenant_id, str(payload.get("edit_document_id") or ""))
     revision = revision_for_document(db, document, str(revision_id))
-    frozen = assert_render_sources(db, document, revision)
+    frozen = assert_render_sources(db, document, revision) if check_sources else timeline_for_revision(db, revision)
     if (payload.get("plan_revision_id") != revision.id or payload.get("plan_hash") != revision.content_hash
             or payload.get("timeline_hash") != frozen.content_hash or job.project_id != document.project_id
             or manifest.timeline_id != frozen.timeline_id or manifest.source.get("timeline") != frozen.timeline_json
@@ -227,6 +247,7 @@ def validate_render_revision(db: Session, job: models.Job, manifest) -> None:
 def _insert_revision(db: Session, document: models.EditDocument, *, number: int, parent: str | None,
                      key: str, request_hash: str, template: dict, sources: list[dict], plan: dict,
                      timeline: Timeline, operation: dict, existing_timeline: models.Timeline | None = None):
+    _assert_scenario_sources(timeline, sources, TemplateDefinition.model_validate(template))
     if len(json.dumps(sources, ensure_ascii=False).encode()) > 16 * 1024 * 1024:
         raise EditingError("edit_snapshot_limit", "素材及原文快照超过16MiB，请拆分项目", 422)
     revision_id = models.new_id()
@@ -279,6 +300,10 @@ def _replace(row: dict, candidate: dict, rows: list[dict], template: TemplateDef
     slot = next((slot for slot in template.slots if slot.name == row["slot"]), None)
     if slot is None or not _eligible(candidate, slot, template, row["output_duration"]):
         raise EditingError("edit_candidate_ineligible", "该素材不满足镜头类型、时长或方向要求", 422)
+    from .scenario_profiles import template_scenario
+    profile = template_scenario(template)
+    if profile and profile.preserve_speech_meaning and abs(candidate["duration"] - row["output_duration"]) > 1e-8:
+        raise EditingError("edit_scenario_boundary", "口播替换需保留完整讲话单元，请选择相同时长的单元或重新编排计划", 422)
     if any(other["selection_id"] != row["selection_id"] and other["asset_id"] == candidate["candidate_id"] for other in rows):
         raise EditingError("edit_candidate_already_used", "该镜头已在其他位置使用，请选择其他候选", 422)
     row.update(asset_id=candidate["candidate_id"], source_asset_id=candidate["source_asset_id"], name=candidate["name"],
@@ -289,6 +314,8 @@ def _replace(row: dict, candidate: dict, rows: list[dict], template: TemplateDef
 
 def _rows_to_timeline(canonical: Timeline, rows: list[dict], sources: list[dict]) -> Timeline:
     value = canonical.model_dump(mode="json"); by_clip = {row["clip_id"]: row for row in rows}
+    scenario = canonical.metadata.get("scenario")
+    candidates = _candidate_map(sources, canonical.fps, scenario=scenario) if scenario else {}
     for track in value["tracks"]:
         for clip in track["clips"]:
             row = by_clip.get(clip["id"])
@@ -296,6 +323,15 @@ def _rows_to_timeline(canonical: Timeline, rows: list[dict], sources: list[dict]
                 continue
             clip.update(asset_id=row["source_asset_id"], source_start=row["source_start"], source_end=row["source_end"])
             clip["metadata"].update(source_shot_id=row["asset_id"], slot=row["slot"], score=row["score"], rationale=deepcopy(row["rationale"]))
+            if scenario:
+                candidate = candidates.get(row["asset_id"])
+                if candidate is None:
+                    raise EditingError("edit_candidate_ineligible", "该来源缺少本场景必需的分析证据，请先完成分析", 422)
+                speech = candidate["metadata"].get("speech_unit")
+                if speech:
+                    clip["metadata"]["speech_unit"] = deepcopy(speech)
+                else:
+                    clip["metadata"].pop("speech_unit", None)
     used = {clip["asset_id"] for track in value["tracks"] for clip in track["clips"] if clip.get("asset_id")}
     original = {row["id"]: row for row in value["assets"]}; frozen = {row["id"]: row for row in sources}
     value["assets"] = []
@@ -362,7 +398,7 @@ def apply_edit(db: Session, *, document: models.EditDocument, request: schemas.E
             from .storyboards import output_assets
             output_assets(db, assets)
             sources.extend(_capture_sources(assets))
-        rows = plan.get("selected") or []; candidates = _candidate_map(sources, canonical.fps)
+        rows = plan.get("selected") or []; candidates = _candidate_map(sources, canonical.fps, scenario=canonical.metadata.get("scenario"))
         def selected(selection_id):
             row = next((row for row in rows if row["selection_id"] == selection_id), None)
             if row is None:
@@ -460,7 +496,8 @@ def apply_edit(db: Session, *, document: models.EditDocument, request: schemas.E
                         fresh = _plan_rows(document.id, canonical, plan, sources)
                         for old, new in zip(rows, fresh):
                             old.update({key: new[key] for key in ("source_start", "source_end", "timeline_start", "timeline_end", "output_duration")})
-                        planner = AutoEditPlanner().plan(template, shot_features_from_assets(_source_assets(sources)))
+                        from .scenario_profiles import template_scenario
+                        planner = AutoEditPlanner().plan(template, shot_features_from_assets(_source_assets(sources), scenario=template_scenario(template)))
                         plan["warnings"] = list(planner.warnings)
                 else:
                     canonical.resolution = template.metadata["resolution"]

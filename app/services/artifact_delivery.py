@@ -86,6 +86,12 @@ def _eligible_delivery(db: Session, *, tenant_id: str, artifact_id: str):
         job = db.get(models.Job, row.job_id)
         if job is None or job.status != "succeeded" or job.policy_blocked:
             raise StorageGatewayError("artifact_job_not_deliverable", "Task is not eligible for delivery", status_code=409)
+        from .derived_rights import assert_job_rights
+        from .editing_errors import EditingError
+        try:
+            assert_job_rights(db, job)
+        except EditingError as exc:
+            raise StorageGatewayError(exc.code, str(exc), status_code=exc.status_code) from exc
     return archive, expires
 
 

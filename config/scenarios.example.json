@@ -1,0 +1,86 @@
+{
+  "schema_version": "scenario-catalog/1",
+  "profiles": [
+    {
+      "schema_version": "scenario-profile/1",
+      "id": "product_showcase",
+      "version": "1",
+      "name": "商品展示",
+      "description": "商品外观、卖点与真实使用证据优先。",
+      "validation_status": "draft",
+      "acceptance_report": null,
+      "prompt_version": "product-shot-1",
+      "prompt_context": "以已确认的商品资料和参考图为事实依据，保留颜色、结构、包装和文字。仅补选定缺口，明确主体、动作、机位和时长；不能虚构卖点或以氛围画面代替商品证据。",
+      "allowed_operations": [
+        "video_generation"
+      ],
+      "narrative_roles": [
+        "establish_product",
+        "feature_evidence",
+        "usage",
+        "close"
+      ],
+      "selection_weights": {
+        "quality": 0.45,
+        "semantic_match": 0.55
+      },
+      "required_features": [
+        "quality",
+        "semantic_match"
+      ],
+      "minimum_scores": {},
+      "preserve_facts": true,
+      "preserve_speech_meaning": false,
+      "source_policy": "real_first",
+      "required_quality_dimensions": [
+        "facts",
+        "technical",
+        "narrative",
+        "visual",
+        "audio"
+      ],
+      "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728"
+    },
+    {
+      "schema_version": "scenario-profile/1",
+      "id": "spoken_explainer",
+      "version": "1",
+      "name": "口播讲解",
+      "description": "先保留讲解语义，再组织字幕和示意画面。",
+      "validation_status": "draft",
+      "acceptance_report": null,
+      "prompt_version": "spoken-shot-1",
+      "prompt_context": "以确认的讲话和术语为依据，保留否定、数字、指代及上下文。生成画面应与讲解对应，不把示意画面当作真实事件；保留已批准人物与镜头，局部重做须明确。",
+      "allowed_operations": [
+        "video_generation",
+        "person_replace"
+      ],
+      "narrative_roles": [
+        "question",
+        "explanation",
+        "example",
+        "conclusion"
+      ],
+      "selection_weights": {
+        "quality": 0.25,
+        "semantic_match": 0.75
+      },
+      "required_features": [
+        "quality",
+        "semantic_match"
+      ],
+      "minimum_scores": {},
+      "preserve_facts": true,
+      "preserve_speech_meaning": true,
+      "source_policy": "speech_first",
+      "required_quality_dimensions": [
+        "facts",
+        "technical",
+        "narrative",
+        "visual",
+        "audio"
+      ],
+      "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63"
+    }
+  ]
+}

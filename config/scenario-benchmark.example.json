@@ -1,0 +1,221 @@
+{
+  "schema_version": "scenario-benchmark/1",
+  "id": "first-two-scenes",
+  "version": "1",
+  "cases": [
+    {
+      "id": "product_showcase-1",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-1",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "product_showcase-2",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-2",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "product_showcase-3",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-3",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "product_showcase-4",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-4",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "product_showcase-5",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "validation",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-5",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "product_showcase-holdout-1",
+      "scenario": {
+        "id": "product_showcase",
+        "version": "1",
+        "content_hash": "89934c36891e033e2911d7c6357b47792b096138d5ea5dbe9aa7802e599e5728",
+        "prompt_version": "product-shot-1"
+      },
+      "split": "holdout",
+      "status": "planned",
+      "source_group_id": "collect-product_showcase-holdout",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "用未参与提示词和规则调参的新素材复验"
+      ]
+    },
+    {
+      "id": "spoken_explainer-1",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-1",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "spoken_explainer-2",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-2",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "spoken_explainer-3",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-3",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "spoken_explainer-4",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "tuning",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-4",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "spoken_explainer-5",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "validation",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-5",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "需采集本项目授权素材及人工参考成片",
+        "关键事实、技术、叙事、画面与声音分别评审"
+      ]
+    },
+    {
+      "id": "spoken_explainer-holdout-1",
+      "scenario": {
+        "id": "spoken_explainer",
+        "version": "1",
+        "content_hash": "b7b0215d41315b54792a4d277f1f6641286cf4e31c0f3074f3d899b61cd82f63",
+        "prompt_version": "spoken-shot-1"
+      },
+      "split": "holdout",
+      "status": "planned",
+      "source_group_id": "collect-spoken_explainer-holdout",
+      "source_sha256": [],
+      "reference_artifact_id": null,
+      "requirements": [
+        "用未参与提示词和规则调参的新素材复验"
+      ]
+    }
+  ]
+}

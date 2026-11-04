@@ -159,6 +159,83 @@ def test_http_provider_returns_durable_pending_when_poll_window_is_exhausted():
     assert error.value.details["provider_job_id"] == "task-9"
 
 
+@pytest.mark.parametrize("state", ["failed", "error", "cancelled", "canceled"])
+@pytest.mark.parametrize("polled", [False, True])
+@pytest.mark.parametrize("has_artifact", [False, True])
+def test_http_provider_failure_keeps_internal_charge_evidence_without_delivering(state, polled, has_artifact):
+    response = {
+        "provider_job_id": "paid-operation", "request_id": "req-1", "status": state,
+        "usage": {"output_seconds": 5, "api_key": "private"},
+        "cost": {"amount": 0.7, "currency": "USD", "token": "private"},
+        "metrics": {"cloud_job_id": "cloud-task", "credentials": "private"},
+        "error": {"code": "output_verification_failed", "message": "Result is unusable"},
+        # A rejected response cannot override the configured billing identity.
+        "model": {"provider": "untrusted", "model_id": "other", "version": "other"},
+    }
+    if has_artifact:
+        response["artifact_uri"] = "https://cdn.example/rejected.mp4"
+
+    def transport(http_request, _timeout):
+        if polled and http_request.method == "POST":
+            return 202, b'{"provider_job_id":"paid-operation","status":"queued"}'
+        return 200, json.dumps(response).encode()
+
+    model = ModelSnapshot(provider="hosted-video", model_id="t2v", version="7")
+    provider = HTTPProvider(name="hosted-video", base_url="https://provider.example", capabilities=capability(),
+                            model=model, poll_path="/jobs/{provider_job_id}", transport=transport)
+    with pytest.raises(ProviderExecutionError) as caught:
+        provider.execute(request())
+    error = caught.value
+    evidence = error.rejected_result
+    assert error.code == "output_verification_failed" and not error.retryable
+    assert error.details == {"provider_job_id": "paid-operation", "provider_status": state}
+    assert evidence.status == "failed" and evidence.artifact_uri == "" and evidence.model == model
+    assert evidence.provenance == {"provider_request_id": "req-1", "provider_job_id": "paid-operation"}
+    assert evidence.usage == {"output_seconds": 5, "api_key": "[REDACTED]"}
+    assert evidence.cost == {"amount": 0.7, "currency": "USD", "token": "[REDACTED]"}
+    assert evidence.metrics == {"cloud_job_id": "cloud-task", "credentials": "[REDACTED]"}
+    assert "artifact_uri" not in error.details and "cost" not in error.details
+
+
+def test_http_provider_failure_without_cost_preserves_unknown_instead_of_inventing_zero():
+    provider = HTTPProvider(name="hosted-video", base_url="https://provider.example", capabilities=capability(),
+        transport=lambda _request, _timeout: (200, b'{"status":"failed","task_id":"accepted-task"}'))
+    with pytest.raises(ProviderExecutionError) as caught:
+        provider.execute(request())
+    assert caught.value.rejected_result.cost == {}
+    assert caught.value.rejected_result.provenance["provider_job_id"] == "accepted-task"
+
+
+@pytest.mark.parametrize("failure", ["timeout", "server_error", "invalid_json", "invalid_artifact"])
+def test_http_poll_error_never_loses_accepted_remote_identity(failure):
+    def transport(http_request, _timeout):
+        if http_request.method == "POST":
+            return 202, b'{"provider_job_id":"accepted-task","status":"queued"}'
+        if failure == "timeout":
+            raise TimeoutError("synthetic poll timeout")
+        if failure == "server_error":
+            return 503, b"busy"
+        if failure == "invalid_json":
+            return 200, b"not-json"
+        return 200, b'{"status":"succeeded","artifact_uri":"file:///private/result.mp4"}'
+
+    provider = HTTPProvider(name="hosted-video", base_url="https://provider.example", capabilities=capability(),
+                            poll_path="/jobs/{provider_job_id}", transport=transport)
+    with pytest.raises(ProviderExecutionError) as caught:
+        provider.execute(request())
+    assert caught.value.details["provider_job_id"] == "accepted-task"
+    assert caught.value.retryable is (failure in {"timeout", "server_error"})
+
+
+def test_http_provider_success_without_artifact_is_not_accepted():
+    provider = HTTPProvider(name="hosted-video", base_url="https://provider.example", capabilities=capability(),
+        transport=lambda _request, _timeout: (200, b'{"status":"succeeded"}'))
+    with pytest.raises(ProviderExecutionError) as caught:
+        provider.execute(request())
+    assert caught.value.code == "provider_invalid_response"
+    assert caught.value.rejected_result is None
+
+
 def test_http_provider_callback_signature_is_verified_and_normalized():
     secret = "callback-secret"
     provider = HTTPProvider(

@@ -84,3 +84,51 @@ def test_allocation_conserves_frames_with_mixed_source_capacities(capacities):
 def test_invalid_frame_rates_fail_before_any_authoring(fps):
     with pytest.raises(ValueError):
         FrameClock(fps)
+
+
+@pytest.mark.parametrize('fps', [25, 29.97, 30])
+def test_proportional_trimming_preserves_slot_minimum_in_whole_frames(fps):
+    template, asset, _ = _case([(0, 10), (10, 20)], 2.5, fps)
+    template.slots = [TemplateSlot(name='hero', type=SlotType.VIDEO, constraints=SlotConstraints(min_duration=2.1)),
+                      TemplateSlot(name='detail', type=SlotType.VIDEO)]
+    plan = AutoEditPlanner().plan(template, shot_features_from_assets([asset]))
+    timeline = compile_auto_edit_timeline(template, [row.__dict__ for row in plan.selected], [asset], timeline_id='bounded')
+    clock = FrameClock(fps)
+    hero, detail = timeline.tracks[0].clips
+    assert clock.floor(hero.range.end - hero.range.start) >= clock.ceil(2.1)
+    assert clock.floor(detail.range.end - detail.range.start) >= 1
+    assert clock.floor(timeline.duration) == clock.floor(2.5)
+    assert hero.source_end <= 10 and detail.source_end <= 20
+
+
+def test_target_below_required_clip_minima_is_rejected_instead_of_shortening_them():
+    template, asset, _ = _case([(0, 4), (4, 8)], 3)
+    template.slots = [TemplateSlot(name=name, type=SlotType.VIDEO, constraints=SlotConstraints(min_duration=2))
+                      for name in ('opening', 'closing')]
+    plan = AutoEditPlanner().plan(template, shot_features_from_assets([asset]))
+    with pytest.raises(ValueError, match='最小时长'):
+        compile_auto_edit_timeline(template, [row.__dict__ for row in plan.selected], [asset], timeline_id='impossible')
+
+
+def test_compiler_caps_a_direct_selection_at_the_slot_maximum():
+    template, asset, selected = _case([(0, 4)], 4)
+    template.slots[0].constraints = SlotConstraints(max_duration=1)
+    timeline = compile_auto_edit_timeline(template, selected, [asset], timeline_id='maximum')
+    assert timeline.duration == 1
+    assert timeline.tracks[0].clips[0].source_end == 1
+
+
+def test_frame_rounding_cannot_extend_source_to_satisfy_a_slot_minimum():
+    template, asset, _ = _case([(0.001, 2.001)], 2)
+    template.slots[0].constraints = SlotConstraints(min_duration=2)
+    assert not AutoEditPlanner().plan(template, shot_features_from_assets([asset])).selected
+    with pytest.raises(ValueError, match='不能隐式延长'):
+        compile_auto_edit_timeline(template, [{'slot': 'sequence', 'asset_id': 'source#shot-0'}], [asset], timeline_id='short-source')
+
+
+@pytest.mark.parametrize('suffix', ['2', '-1', 'invalid'])
+def test_stale_shot_identity_cannot_fall_back_to_the_entire_asset(suffix):
+    template, asset, _ = _case([(0, 1), (1, 2)], 1)
+    with pytest.raises(ValueError, match='selected shot is unavailable'):
+        compile_auto_edit_timeline(template, [{'slot': 'sequence', 'asset_id': 'source#shot-' + suffix}],
+                                   [asset], timeline_id='stale-shot')

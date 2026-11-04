@@ -38,7 +38,7 @@ def test_complete_candidate_is_reproducible_and_extracts_both_clients(release_so
     assert first['sha256']==second['sha256'] and first['content_id']==second['content_id']
     archive=tmp_path/'first'/'release.tar.gz'
     assert sentinel not in gzip.decompress(archive.read_bytes())
-    contracts=first['contracts'];assert contracts['native_pages']==15 and contracts['web_scripts']==25
+    contracts=first['contracts'];assert contracts['native_pages']==16 and contracts['web_scripts']==28
     assert contracts['target_database_version']=='0023_shot_matching'
     assert contracts['wechat_appid_configured']==bool(json.loads((release_source/'miniprogram/project.config.json').read_bytes()).get('appid'))
     assert not first['stage_validation_run']
@@ -47,6 +47,17 @@ def test_complete_candidate_is_reproducible_and_extracts_both_clients(release_so
     release.extract_release(archive,expected_sha256=first['sha256'],destination=extracted)
     assert (extracted/'Dockerfile').is_file() and (extracted/'infra/Dockerfile.control').is_file()
     assert (extracted/'tests/test_postgres_recovery.py').is_file() and (extracted/'miniprogram/src/pages/batch-delivery/index.ts').is_file()
+    assert (extracted/'miniprogram/src/vendor/ai-tools-form.js').is_file()
+    assert (extracted/'miniprogram/src/vendor/scenario-review-form.js').is_file()
+    assert (extracted/'web/scenario-review-form.js').is_file()
+    assert (extracted/'miniprogram/src/pages/ai-tools/index.ts').is_file()
+    assert (extracted/'config/providers.aliyun.ai.example.json').is_file()
+    for name in ('scenarios.example.json', 'scenario-benchmark.example.json', 'providers.multimodel.example.json'):
+        assert (extracted/'config'/name).is_file()
+    assert (extracted/'app/api/project_quality.py').is_file()
+    assert (extracted/'app/services/speech_evidence.py').is_file()
+    assert (extracted/'docs/quality-issue-register.md').is_file()
+    assert (extracted/'docs/ai-production.md').is_file()
     assert release.verify_tree(extracted,expected_content_id=first['content_id'])['ok']
     with pytest.raises(ReleaseError,match='new_output_directory'):release.build_release(release_source,tmp_path/'first',label='m2-review')
 

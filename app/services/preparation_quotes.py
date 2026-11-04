@@ -75,6 +75,8 @@ def _template(db,tenant,body):
     if not project or not template or template.project_id not in {None,project.id}:raise EditingError('preparation_template_missing','未找到本项目可用模板',404)
     try:
         value=TemplateDefinition.model_validate(template.content)
+        from .scenario_profiles import freeze_template_scenario
+        value=freeze_template_scenario(value)
         if body.get('target_duration') is not None:value.duration=body['target_duration']
         if body.get('aspect_ratio'):value.metadata={**value.metadata,'resolution':{'9:16':{'width':1080,'height':1920},'16:9':{'width':1920,'height':1080},'1:1':{'width':1080,'height':1080}}[body['aspect_ratio']]}
         return value.model_dump(mode='json')

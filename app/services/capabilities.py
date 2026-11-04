@@ -9,12 +9,18 @@ import math
 from ..config import get_settings
 from .provider_registry import ConfiguredProviderRegistry, ProviderRegistryError
 from .providers import ProviderExecutionError, ProviderRequest
+from .model_requests import public_contract, public_routing
 
 
 PUBLIC_LIMITS = {
     "max_input_bytes", "max_duration_seconds", "max_output_duration_seconds",
-    "max_inputs", "max_concurrent", "aspect_ratios", "resolutions", "formats", "features",
+    "max_inputs", "max_concurrent", "aspect_ratios", "resolutions", "formats", "features", "feature_combinations",
+    "generation_resolutions", "allowed_durations", "generation_modes", "min_reference_inputs",
+    "max_reference_inputs", "max_prompt_chars", "max_negative_prompt_chars", "output_fps_by_mode",
+    "request_contract", "model_routing",
 }
+
+INTEGER_LIMITS = {"min_reference_inputs", "max_reference_inputs", "max_prompt_chars", "max_negative_prompt_chars"}
 
 
 def _public_limits(values: dict) -> dict:
@@ -22,11 +28,40 @@ def _public_limits(values: dict) -> dict:
     for key, value in values.items():
         if key not in PUBLIC_LIMITS:
             continue
-        if key.startswith("max_"):
+        if key in {"request_contract", "model_routing"}:
+            public = (public_contract if key == "request_contract" else public_routing)(value)
+            if public is not None:
+                limits[key] = public
+        elif key == "output_fps_by_mode":
+            if not isinstance(value, dict):
+                continue
+            limits[key] = {mode: fps for mode, fps in list(value.items())[:64]
+                           if isinstance(mode, str) and 0 < len(mode) <= 100 and mode == mode.strip()
+                           and all(32 <= ord(character) < 127 for character in mode)
+                           and isinstance(fps, (int, float)) and not isinstance(fps, bool)
+                           and math.isfinite(fps) and 1 <= fps <= 120}
+        elif key in INTEGER_LIMITS:
+            if type(value) is int and value >= 0:
+                limits[key] = value
+        elif key.startswith("max_"):
             if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0:
                 limits[key] = value
         elif isinstance(value, list):
-            if key == "resolutions":
+            if key == "allowed_durations":
+                limits[key] = sorted({item for item in value[:64]
+                                      if isinstance(item, (int, float)) and not isinstance(item, bool)
+                                      and math.isfinite(item) and item > 0})
+            elif key in {"generation_resolutions", "generation_modes"}:
+                limits[key] = sorted({item for item in value[:64]
+                                      if isinstance(item, str) and 0 < len(item) <= 100
+                                      and item == item.strip() and all(ord(character) >= 32 and ord(character) != 127 for character in item)})
+            elif key == "feature_combinations":
+                # Each complete row describes one accepted combination. Never
+                # flatten rows: independent acceptance does not prove mixing.
+                limits[key] = [sorted(set(row)) for row in value[:64] if isinstance(row, list)
+                               and 0 < len(row) <= 64
+                               and all(isinstance(item, str) and 0 < len(item) <= 100 for item in row)]
+            elif key == "resolutions":
                 limits[key] = [{field: item[field] for field in ("width", "height")}
                                for item in value if isinstance(item, dict)
                                and all(isinstance(item.get(field), int) and item[field] > 0 for field in ("width", "height"))]
@@ -67,6 +102,10 @@ def capability_catalog(registry: ConfiguredProviderRegistry | None = None) -> di
                 except ProviderExecutionError:
                     status = "policy_unavailable"
             limits = _public_limits(capability.limits)
+            if any(key in capability.limits and key not in limits for key in ("request_contract", "model_routing")):
+                # Invalid model contracts cannot fall through to the old Wan
+                # parameter rules after their public projection is removed.
+                status = "invalid_model_contract"
             entries.append({
                 "id": f"{registration.name}:{capability.name}:{registration.model.version}",
                 "capability": capability.name, "provider": registration.name,

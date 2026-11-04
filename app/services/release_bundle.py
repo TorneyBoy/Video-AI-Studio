@@ -35,8 +35,9 @@ CONFIG_FILES=frozenset('''
 aliyun-analysis-client-policy.json aliyun-analysis-client-policy.template.json
 aliyun-ecs-role-trust.json aliyun-ice-client-policy.json aliyun-ice-role-trust.json
 aliyun-ice-storage-policy.json aliyun-ice-storage-policy.proposed-v2.json
-aliyun-storage-policy.json provider-smoke.example.json providers.aliyun.m1.json
-providers.contract.fixture.json providers.example.json
+aliyun-storage-policy.json provider-smoke.example.json providers.aliyun.m1.json providers.aliyun.ai.example.json
+providers.contract.fixture.json providers.example.json scenarios.example.json scenario-benchmark.example.json
+providers.multimodel.example.json
 '''.split())
 EXTENSIONS={
     'app':{'.py'},'media_gateway':{'.py'},'timeline_engine':{'.py'},
@@ -74,7 +75,7 @@ def admitted(name):
         return False
     if ignored(name):return False
     if name in ROOT_FILES or name=='infra/Dockerfile.control':return True
-    if name in {'miniprogram/src/vendor/sha256.js','miniprogram/src/vendor/batch-form.js','miniprogram/src/vendor/storyboard-form.js','miniprogram/src/vendor/shot-matching-form.js'}:return True
+    if name in {'miniprogram/src/vendor/sha256.js','miniprogram/src/vendor/batch-form.js','miniprogram/src/vendor/storyboard-form.js','miniprogram/src/vendor/shot-matching-form.js','miniprogram/src/vendor/ai-tools-form.js','miniprogram/src/vendor/scenario-review-form.js'}:return True
     if path.parts[0]=='config' and (len(path.parts)!=2 or path.name not in CONFIG_FILES):return False
     if path.parts[0]=='.github' and name!='.github/workflows/ci.yml':return False
     return len(path.parts)>1 and path.suffix in EXTENSIONS.get(path.parts[0],set())

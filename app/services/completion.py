@@ -105,6 +105,9 @@ def prepare_provider_call(db: Session, job: models.Job, ticket: ExecutionTicket,
         from .preparation_quotes import validate_analysis_price
         validate_analysis_price(db, job)
     if request.capability == "video_editing" and request.inputs.get("timeline") and not (request.parameters.get("provider_job_id") or (operation and operation.external_job_id)):
+        from .media_quality import assert_renderer_quality
+        model = getattr(selected, "model", None) or getattr(selected, "model_snapshot", None)
+        assert_renderer_quality(request.inputs["timeline"], renderer_model_id=getattr(model, "model_id", None) or request.model_id)
         try:
             current = require_render_support(request.inputs["timeline"], require_price=bool((job.payload or {}).get("quote_id")), provider=selected.name, model_id=request.model_id, model_version=request.model_version)
             if ((job.payload or {}).get("quote_id") and (operation is None or operation.state == "created")
@@ -118,6 +121,12 @@ def prepare_provider_call(db: Session, job: models.Job, ticket: ExecutionTicket,
         "model_id": request.model_id, "model_version": request.model_version,
     }, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
     remote_id = (operation.external_job_id if operation else None) or request.parameters.get("provider_job_id")
+    if request.capability == "video_editing" and not remote_id:
+        from .derived_rights import assert_job_rights
+        try:
+            assert_job_rights(db, job, lock_policy=True)
+        except EditingError as exc:
+            raise ProviderExecutionError(str(exc), code=exc.code, capability=request.capability, retryable=False) from exc
     if not remote_id and (operation is None or operation.state in {"created", "rejected"}):
         from .budgets import validate_dispatch_budget
         validate_dispatch_budget(db,job)

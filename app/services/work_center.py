@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, aliased
 
 from .. import models
 from .artifact_reviews import output_binding
+from .artifact_quality_gate import quality_evidence
 from .delivery_packages import utc
 from .editing import digest
 from .editing_errors import EditingError
@@ -36,17 +37,27 @@ def _encode(row):
 def _query(tenant_id,project_id):
     job=models.Job;artifact=models.Artifact;archive=models.ArtifactStorage;review=aliased(models.ArtifactReview)
     latest=select(models.ArtifactReview.id).where(models.ArtifactReview.artifact_id==artifact.id).order_by(models.ArtifactReview.number.desc()).limit(1).correlate(artifact).scalar_subquery()
+    quality_source=aliased(models.Artifact);quality_review=aliased(models.Artifact)
+    latest_quality=select(quality_source.id).where(quality_source.tenant_id==tenant_id,quality_source.project_id==project_id,
+        quality_source.kind=="scenario.quality_review",quality_source.metadata_json["artifact_id"].as_string()==artifact.id
+        ).order_by(quality_source.created_at.desc(),quality_source.id.desc()).limit(1).correlate(artifact).scalar_subquery()
     fields=[job.id.label("job_id"),job.type,job.status.label("job_status"),job.created_at,job.policy_blocked,job.failure_code,
         artifact.id.label("artifact_id"),artifact.project_id.label("artifact_project"),artifact.delivery_status,artifact.legacy_duplicate_of,
         artifact.output_role,artifact.output_index,artifact.metadata_json["quality_control"].label("qc"),
+        artifact.metadata_json["output_sha256"].as_string().label("output_sha256"),
+        artifact.metadata_json["metrics"].label("quality_metrics"),quality_review.id.label("scenario_review_id"),
+        quality_review.metadata_json.label("scenario_review_metadata"),
         archive.sha256,archive.size_bytes,archive.expires_at,
         review.id.label("review_id"),review.decision,review.binding_hash.label("review_binding"),models.PlanRevision.number.label("revision_number")]
     for key in ("edit_document_id","plan_revision_id","timeline_revision_id","plan_hash","timeline_hash"):
         fields.append(job.payload[key].as_string().label(key))
     fields.append(job.payload["manifest"]["content_hash"].as_string().label("manifest_hash"))
+    fields.append(job.payload["manifest"]["source"]["timeline"]["metadata"]["scenario"].label("timeline_scenario"))
+    fields.append(job.payload["ai_production"]["snapshot"]["scenario"].label("ai_scenario"))
     return (select(*fields).select_from(job).outerjoin(artifact,and_(artifact.job_id==job.id,artifact.tenant_id==tenant_id,
         artifact.output_role=="primary",artifact.output_index==0)).outerjoin(archive,archive.artifact_id==artifact.id)
-        .outerjoin(review,review.id==latest).outerjoin(models.PlanRevision,and_(models.PlanRevision.id==job.payload["timeline_revision_id"].as_string(),models.PlanRevision.tenant_id==tenant_id))
+        .outerjoin(review,review.id==latest).outerjoin(quality_review,quality_review.id==latest_quality)
+        .outerjoin(models.PlanRevision,and_(models.PlanRevision.id==job.payload["timeline_revision_id"].as_string(),models.PlanRevision.tenant_id==tenant_id))
         .where(job.tenant_id==tenant_id,job.project_id==project_id,job.type.in_(("render.draft","render.high"))))
 
 
@@ -63,14 +74,20 @@ def _view(row,tenant_id,project_id):
         state="unavailable";reason="结构质检或归档证据仍待处理"
     else:
         item=SimpleNamespace(id=row["artifact_id"],tenant_id=tenant_id,project_id=project_id,job_id=row["job_id"],
-            output_role=row["output_role"],output_index=row["output_index"],metadata_json={"quality_control":qc})
+            output_role=row["output_role"],output_index=row["output_index"],metadata_json={"quality_control":qc,"metrics":row["quality_metrics"],"output_sha256":row["output_sha256"]})
         archive=SimpleNamespace(sha256=row["sha256"],size_bytes=row["size_bytes"])
         payload={key:row[key] for key in ("edit_document_id","plan_revision_id","timeline_revision_id","plan_hash","timeline_hash")}
-        payload["manifest"]={"content_hash":row["manifest_hash"]}
-        binding=digest(output_binding(item,payload,archive))
-        if row["review_id"]:
+        payload["manifest"]={"content_hash":row["manifest_hash"],"source":{"timeline":{"metadata":{"scenario":row["timeline_scenario"]}}}}
+        payload["ai_production"]={"snapshot":{"scenario":row["ai_scenario"]}}
+        scenario_review=SimpleNamespace(id=row["scenario_review_id"],metadata_json=row["scenario_review_metadata"]) if row["scenario_review_id"] else None
+        quality=quality_evidence(item,payload,latest_review=scenario_review)
+        binding=digest(output_binding(item,payload,archive,quality_binding=quality["binding"]))
+        if not quality["ready"]:
+            state="unavailable";reason=quality["reason"]
+        elif row["review_id"]:
             state="stale" if row["review_binding"]!=binding else "approved" if row["decision"]=="approved" else "returned"
-        reason="批准仅适用于这份输出；正式领取时仍会核对当前媒体和来源权限" if state=="approved" else LABELS[state]
+        if quality["ready"]:
+            reason="批准仅适用于这份输出；正式领取时仍会核对当前媒体和来源权限" if state=="approved" else LABELS[state]
     return {"job_id":row["job_id"],"artifact_id":row["artifact_id"],"state":state,"status_label":LABELS[state],"reason":reason,
         "job_status":row["job_status"],"quality":"draft" if row["type"]=="render.draft" else "high", "revision_number":row["revision_number"],
         "created_at":utc(row["created_at"]),"failure_code":row["failure_code"] if state=="failed" else None,

@@ -43,6 +43,7 @@ Page({
   },
   openBatches(){wx.navigateTo({url:'/pages/batches/index'});},
   openStoryboards(){wx.navigateTo({url:'/pages/storyboards/index'});},
+  openAiTools(){wx.navigateTo({url:'/pages/ai-tools/index'});},
   openAssets() {wx.switchTab({url: '/pages/assets/index'});},
   openStudio() {wx.navigateTo({url: '/pages/studio/index'});},
   openBilling() {wx.navigateTo({url: '/pages/billing/index'});},

@@ -13,7 +13,8 @@
     "test:runs": "node ../tests/miniprogram_batch_runs.cjs",
     "test:batch-delivery": "node ../tests/miniprogram_batch_delivery.cjs",
     "test:storyboards": "node ../tests/miniprogram_storyboards.cjs",
-    "test:shot-matching": "node ../tests/miniprogram_shot_matching.cjs"
+    "test:shot-matching": "node ../tests/miniprogram_shot_matching.cjs",
+    "test:ai-tools": "node ../tests/miniprogram_ai_tools.cjs"
   },
   "devDependencies": {
     "miniprogram-api-typings": "5.2.3",

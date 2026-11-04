@@ -16,7 +16,7 @@
       <a class="nav-item" href="#studio"><span>✦</span> 开始创作</a>
       <a class="nav-item" href="#materials"><span>◇</span> 素材库 <span class="nav-count" id="navAssetCount">—</span></a>
       <a class="nav-item" href="#works"><span>▷</span> 作品</a>
-      <a class="nav-item" href="#storyboards" id="openStoryboardsBtn"><span>▥</span> 参考创作</a><a class="nav-item" href="#batches" id="openBatchesBtn"><span>▤</span> 批量制作</a><a class="nav-item" href="#billing" id="openBillingBtn"><span>◈</span> 费用与恢复</a>
+      <a class="nav-item" href="#aiProduction" id="openAiProductionBtn"><span>✧</span> AI制作</a><a class="nav-item" href="#storyboards" id="openStoryboardsBtn"><span>▥</span> 参考创作</a><a class="nav-item" href="#batches" id="openBatchesBtn"><span>▤</span> 批量制作</a><a class="nav-item" href="#billing" id="openBillingBtn"><span>◈</span> 费用与恢复</a>
       <a class="nav-item" href="#timeline"><span>◷</span> 任务队列</a>
     </nav>
     <div class="sidebar-bottom" id="account">
@@ -41,6 +41,7 @@
       <button class="text-btn" id="viewAllBtn" type="button">刷新项目列表 <span>→</span></button>
     </section>
     <div class="lower-grid">
+      <section id="aiProduction" class="panel"><section id="aiProductionPanel" hidden aria-label="AI补镜头与换人物"></section><p>选择项目后，点击“AI制作”补镜头、换脸或换人物。</p></section>
       <section id="storyboards" class="panel"><section id="storyboardPanel" hidden aria-label="参考创作与分镜"></section><section id="shotMatchingPanel" hidden aria-label="镜头素材与补拍"></section><p id="storyboardIntro">选择项目后，点击“参考创作”查看参考范围与分镜方案。</p></section><section id="batches" class="panel batch-panel"><section id="batchPanel" hidden aria-label="批量制作"></section><section id="batchRunsPanel" hidden aria-label="批次生成与恢复"></section><section id="batchDeliveryPanel" hidden aria-label="本轮审核与领取"></section><p id="batchIntro">批量配置并生成独立剪辑计划，请点击左侧“批量制作”。</p></section><section id="billing" class="panel"><section id="billingPanel" hidden aria-label="费用与任务恢复"></section><p id="billingIntro">查看项目预算、费用记录与任务恢复，请点击左侧“费用与恢复”。</p></section><section class="panel" id="works"><div class="section-heading compact"><div><h2>项目作品</h2><p>播放、下载或继续处理已有的视频。</p></div></div><div id="workCenterTools" class="editor-toolbar"></div><div id="workList" class="work-list"><div class="empty-state">选择项目后查看作品。</div></div><button id="moreWorksBtn" type="button" class="small-action" hidden>加载更多作品</button><section id="comparisonPanel" class="subtitle-editor" hidden aria-label="版本比较"></section></section>
       <section class="panel timeline-panel" id="timeline"><div class="section-heading compact"><div><h2>任务进度</h2><p>查看实际进度，继续未完成的任务。</p></div><span class="live-label"><i></i> 待同步</span></div><div class="timeline"><div class="empty-state">选择项目后查看任务。</div></div><div class="job-detail" id="jobDetail" hidden></div><button class="text-btn" id="timelineBtn" type="button">刷新任务 <span>→</span></button></section>
     </div>
@@ -122,6 +123,7 @@
 <script src="/web/clip-editor.js" defer></script>
 <script src="/web/subtitle-editor.js" defer></script>
 <script src="/web/layer-editor.js" defer></script>
+<script src="/web/scenario-review-form.js" defer></script>
 <script src="/web/reviews.js" defer></script>
 <script src="/web/delivery.js" defer></script>
 <script src="/web/billing.js" defer></script>
@@ -134,6 +136,8 @@
 <script src="/web/storyboards.js" defer></script>
 <script src="/web/shot-matching-form.js" defer></script>
 <script src="/web/shot-matching.js" defer></script>
+<script src="/web/ai-tools-form.js" defer></script>
+<script src="/web/ai-tools.js" defer></script>
 <script src="/web/account.js" defer></script>
 <script src="/app.js" defer></script>
 </body>

@@ -30,10 +30,10 @@ jobs:
         with:
           node-version: "20"
       - run: python -m pip install -c requirements-dev.lock -e '.[dev,gateway,ice,fc,operations]'
+      - run: npm ci --prefix miniprogram
       - run: python scripts/quality_gate.py all
         env:
           TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
-      - run: npm ci --prefix miniprogram
       - run: npm run typecheck --prefix miniprogram
       - run: npm run test:studio --prefix miniprogram
       - run: npm run test:reviews --prefix miniprogram

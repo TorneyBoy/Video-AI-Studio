@@ -12,6 +12,7 @@ from .. import models
 from ..config import get_settings
 from ..review_schemas import ReviewSubmit
 from .artifact_delivery import _artifact, _eligible_delivery
+from .artifact_quality_gate import latest_quality_review, quality_evidence
 from .completion import render_revision_binding
 from .editing import EditingError, digest, validate_render_revision
 from .media_quality import validate_render_quality
@@ -46,16 +47,19 @@ def review_read(row: models.ArtifactReview) -> dict:
             "note": row.note, "issues": row.issues_json, "created_at": created}
 
 
-def output_binding(row, payload: dict, archive, qc: dict | None = None) -> dict:
+def output_binding(row, payload: dict, archive, qc: dict | None = None, *, quality_binding=None) -> dict:
     """The same lightweight content fingerprint used by review and works lists."""
     if qc is None: qc = (row.metadata_json or {}).get("quality_control") or {}
     qc = {key: qc[key] for key in QC_FIELDS if key in qc} if isinstance(qc, dict) else {}
-    return {"schema_version": "artifact-review-binding/1", "artifact_id": row.id,
+    result = {"schema_version": "artifact-review-binding/1", "artifact_id": row.id,
         "tenant_id": row.tenant_id, "project_id": row.project_id, "job_id": row.job_id,
         "output_role": row.output_role, "output_index": row.output_index,
         "archive_sha256": archive.sha256 if archive else None, "archive_size": archive.size_bytes if archive else None,
         "quality_hash": digest(qc), "manifest_hash": (payload.get("manifest") or {}).get("content_hash"),
         **{key: payload.get(key) for key in ("edit_document_id", "plan_revision_id", "timeline_revision_id", "plan_hash", "timeline_hash")}}
+    if quality_binding:
+        result["quality_evidence"] = quality_binding
+    return result
 
 
 def _context(db: Session, row: models.Artifact) -> dict:
@@ -64,7 +68,8 @@ def _context(db: Session, row: models.Artifact) -> dict:
     archive = db.get(models.ArtifactStorage, row.id)
     job = db.get(models.Job, row.job_id) if row.job_id else None
     payload = job.payload or {} if job else {}
-    binding = output_binding(row,payload,archive,qc)
+    quality = quality_evidence(row, payload, latest_review=latest_quality_review(db, row))
+    binding = output_binding(row,payload,archive,qc,quality_binding=quality["binding"])
     ready = True; reason = "结构质检和归档已通过，请人工审阅画面、声音与字幕。"; code = None
     duration = qc.get("duration_seconds")
     if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not isfinite(duration) or duration <= 0:
@@ -95,7 +100,10 @@ def _context(db: Session, row: models.Artifact) -> dict:
                   "artifact_job_not_deliverable": "任务尚未达到交付条件。"}.get(exc.code, "当前成片尚不可交付。")
     except (ValueError, TypeError, EditingError, ProviderExecutionError):
         ready = False; code = "review_binding_invalid"; reason = "成片内容、质检或输入版本无法核对，不能批准或领取。"
-    return {"binding": binding, "binding_hash": digest(binding), "ready": ready, "reason": reason, "code": code,
+    preview_ready = ready
+    if ready and not quality["ready"]:
+        ready = False; reason = quality["reason"]; code = quality["code"]
+    return {"binding": binding, "binding_hash": digest(binding), "ready": ready, "preview_ready": preview_ready, "reason": reason, "code": code,
             "duration": duration, "revision_number": revision_number, "origin_job_id": origin_job_id,
             "measurements": {key: qc[key] for key in ("width", "height", "duration_seconds", "fps", "has_audio", "video_codec", "container") if key in qc}}
 
@@ -107,8 +115,8 @@ def review_report(db: Session, *, tenant_id: str, artifact_id: str, actor_id: st
     return {"artifact_id": artifact_id, "job_id": row.job_id, "project_id": row.project_id,
         "binding_hash": context["binding_hash"], "binding": context["binding"], "status": status,
         "latest": review_read(latest) if latest else None, "can_review": can_review(db, tenant_id, actor_id),
-        "can_preview": context["ready"], "can_download": context["ready"] and status == "approved",
-        "quality_ready": context["ready"], "quality_scope": "结构质检；画面、声音和字幕内容需人工审阅",
+        "can_preview": context["preview_ready"], "can_download": context["ready"] and status == "approved",
+        "quality_ready": context["ready"], "quality_scope": "结构质检、现有质量问题和场景分项评审；正式领取仍需所有者批准",
         "reason": context["reason"], "duration": context["duration"], "measurements": context["measurements"],
         "revision_number": context["revision_number"], "origin_job_id": context["origin_job_id"]}
 

@@ -1,0 +1,296 @@
+{
+  "template_only": true,
+  "notes": [
+    "Disabled unverified examples; no paid or production acceptance has been completed.",
+    "Enable only after scoped credentials, terms review, budget and model-specific media acceptance.",
+    "Three distinct adapter names are bound by X-Wan-Provider and frozen in the gateway operation.",
+    "Reservation uses the highest configured Beijing rate and maximum duration, without assuming free quota."
+  ],
+  "pricing_evidence": {
+    "checked_on": "2026-11-04",
+    "region": "cn-beijing",
+    "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+    "generation_cny_per_second": {
+      "480P": 0.14,
+      "1080P": 0.7
+    },
+    "replacement_cny_per_second": {
+      "wan-std": 0.6,
+      "wan-pro": 0.9
+    },
+    "reservation_max_cny": {
+      "video_generation": 3.5,
+      "person_replacement": 27
+    },
+    "actual_charge": "unknown_until_vendor_bill_reconciliation"
+  },
+  "providers": [
+    {
+      "name": "aliyun-wan-t2v",
+      "kind": "http",
+      "enabled": false,
+      "endpoint": "https://video-ai-gateway.internal:8100",
+      "path": "/v1/wan",
+      "poll_path": "/v1/wan/jobs/{provider_job_id}",
+      "health_path": "/v1/wan/health",
+      "headers": {
+        "X-Wan-Provider": "aliyun-wan-t2v"
+      },
+      "headers_env": {
+        "Authorization": "MEDIA_GATEWAY_AUTHORIZATION"
+      },
+      "timeout_seconds": 120,
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 540,
+      "max_poll_attempts": 180,
+      "model": {
+        "provider": "aliyun-wan-t2v",
+        "model_id": "wan2.2-t2v-plus",
+        "version": "wan2.2",
+        "license_snapshot": {
+          "commercial_allowed": false,
+          "status": "draft",
+          "code_license": "project-gateway-code-and-provider-api-terms",
+          "weights_license": "provider-managed",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "Wan API contract:wan2.2-t2v-plus;gateway WAN_MODEL_VERSION=wan2.2;operator must review current provider terms",
+          "allowed_regions": [
+            "cn-beijing"
+          ],
+          "content_restrictions": [
+            "authorized-source-media",
+            "authorized-person-reference"
+          ]
+        }
+      },
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": [
+            "text"
+          ],
+          "output_types": [
+            "video"
+          ],
+          "commercial_allowed": false,
+          "regions": [
+            "cn-beijing"
+          ],
+          "acceptance": {
+            "status": "unverified",
+            "model_version": "wan2.2"
+          },
+          "price_version": "aliyun-wan22-beijing-max-1080p-20261104",
+          "cost": {
+            "per_minute": 42,
+            "currency": "CNY",
+            "billing_unit": "minute"
+          },
+          "limits": {
+            "max_output_duration_seconds": 5,
+            "max_duration_seconds": 5,
+            "max_input_bytes": 104857600,
+            "max_inputs": 0,
+            "max_concurrent": 1,
+            "min_reference_inputs": 0,
+            "max_reference_inputs": 0,
+            "max_prompt_chars": 800,
+            "max_negative_prompt_chars": 500,
+            "formats": [
+              "mp4"
+            ],
+            "features": [
+              "text_to_video"
+            ],
+            "allowed_durations": [
+              5
+            ],
+            "generation_resolutions": [
+              "480P",
+              "1080P"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "aliyun-wan-i2v",
+      "kind": "http",
+      "enabled": false,
+      "endpoint": "https://video-ai-gateway.internal:8100",
+      "path": "/v1/wan",
+      "poll_path": "/v1/wan/jobs/{provider_job_id}",
+      "health_path": "/v1/wan/health",
+      "headers": {
+        "X-Wan-Provider": "aliyun-wan-i2v"
+      },
+      "headers_env": {
+        "Authorization": "MEDIA_GATEWAY_AUTHORIZATION"
+      },
+      "timeout_seconds": 120,
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 540,
+      "max_poll_attempts": 180,
+      "model": {
+        "provider": "aliyun-wan-i2v",
+        "model_id": "wan2.2-i2v-plus",
+        "version": "wan2.2",
+        "license_snapshot": {
+          "commercial_allowed": false,
+          "status": "draft",
+          "code_license": "project-gateway-code-and-provider-api-terms",
+          "weights_license": "provider-managed",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "Wan API contract:wan2.2-i2v-plus;gateway WAN_MODEL_VERSION=wan2.2;operator must review current provider terms",
+          "allowed_regions": [
+            "cn-beijing"
+          ],
+          "content_restrictions": [
+            "authorized-source-media",
+            "authorized-person-reference"
+          ]
+        }
+      },
+      "capabilities": [
+        {
+          "name": "video_generation",
+          "input_types": [
+            "text",
+            "remote_image"
+          ],
+          "output_types": [
+            "video"
+          ],
+          "commercial_allowed": false,
+          "regions": [
+            "cn-beijing"
+          ],
+          "acceptance": {
+            "status": "unverified",
+            "model_version": "wan2.2"
+          },
+          "price_version": "aliyun-wan22-beijing-max-1080p-20261104",
+          "cost": {
+            "per_minute": 42,
+            "currency": "CNY",
+            "billing_unit": "minute"
+          },
+          "limits": {
+            "max_output_duration_seconds": 5,
+            "max_duration_seconds": 5,
+            "max_input_bytes": 104857600,
+            "max_inputs": 1,
+            "max_concurrent": 1,
+            "min_reference_inputs": 1,
+            "max_reference_inputs": 1,
+            "max_prompt_chars": 800,
+            "max_negative_prompt_chars": 500,
+            "formats": [
+              "mp4"
+            ],
+            "features": [
+              "image_to_video"
+            ],
+            "allowed_durations": [
+              5
+            ],
+            "generation_resolutions": [
+              "480P",
+              "1080P"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "aliyun-wan-person",
+      "kind": "http",
+      "enabled": false,
+      "endpoint": "https://video-ai-gateway.internal:8100",
+      "path": "/v1/wan",
+      "poll_path": "/v1/wan/jobs/{provider_job_id}",
+      "health_path": "/v1/wan/health",
+      "headers": {
+        "X-Wan-Provider": "aliyun-wan-person"
+      },
+      "headers_env": {
+        "Authorization": "MEDIA_GATEWAY_AUTHORIZATION"
+      },
+      "timeout_seconds": 120,
+      "poll_interval_seconds": 3,
+      "poll_timeout_seconds": 540,
+      "max_poll_attempts": 180,
+      "model": {
+        "provider": "aliyun-wan-person",
+        "model_id": "wan2.2-animate-mix",
+        "version": "wan2.2",
+        "license_snapshot": {
+          "commercial_allowed": false,
+          "status": "draft",
+          "code_license": "project-gateway-code-and-provider-api-terms",
+          "weights_license": "provider-managed",
+          "integrity_mode": "provider_version",
+          "integrity_reference": "Wan API contract:wan2.2-animate-mix;gateway WAN_MODEL_VERSION=wan2.2;operator must review current provider terms",
+          "allowed_regions": [
+            "cn-beijing"
+          ],
+          "content_restrictions": [
+            "authorized-source-media",
+            "authorized-person-reference"
+          ]
+        }
+      },
+      "capabilities": [
+        {
+          "name": "person_replacement",
+          "input_types": [
+            "remote_video",
+            "remote_image"
+          ],
+          "output_types": [
+            "video"
+          ],
+          "commercial_allowed": false,
+          "regions": [
+            "cn-beijing"
+          ],
+          "acceptance": {
+            "status": "unverified",
+            "model_version": "wan2.2"
+          },
+          "price_version": "aliyun-wan22-beijing-max-pro-20261104",
+          "cost": {
+            "per_minute": 54,
+            "currency": "CNY",
+            "billing_unit": "minute"
+          },
+          "limits": {
+            "max_output_duration_seconds": 30,
+            "max_duration_seconds": 30,
+            "max_input_bytes": 104857600,
+            "max_inputs": 2,
+            "max_concurrent": 1,
+            "min_reference_inputs": 1,
+            "max_reference_inputs": 1,
+            "max_prompt_chars": 0,
+            "max_negative_prompt_chars": 0,
+            "formats": [
+              "mp4"
+            ],
+            "features": [
+              "full_person_replacement"
+            ],
+            "output_fps_by_mode": {
+              "wan-std": 15,
+              "wan-pro": 25
+            },
+            "generation_modes": [
+              "wan-std",
+              "wan-pro"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

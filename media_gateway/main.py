@@ -15,7 +15,7 @@ import secrets
 
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from sqlalchemy import JSON, DateTime, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker
@@ -26,8 +26,11 @@ from .oss import ObjectStoreError, OSSStore
 from .credentials import oss_credentials
 from .database import Base
 from .render_jobs import register_render_routes
+from .ice_timeline import OPTIONAL_FEATURES
 from .analysis_jobs import register_analysis_routes
 from .package_jobs import register_package_routes
+from .wan_jobs import register_wan_routes
+from .wan_client import WanSettings
 
 
 class GatewaySettings(BaseModel):
@@ -44,6 +47,7 @@ class GatewaySettings(BaseModel):
     ice_render_enabled: bool = False
     ice_render_max_operations: int = Field(default=6, ge=1, le=10000)
     ice_render_max_duration_seconds: float = Field(default=30, gt=0, le=3600)
+    ice_render_features: list[str] = Field(default_factory=list)
     analysis_enabled: bool = False
     analysis_fc_account_id: str | None = None
     analysis_fc_function_name: str = "video-ai-shot-analysis"
@@ -54,6 +58,13 @@ class GatewaySettings(BaseModel):
     package_max_operations: int = Field(default=6,ge=1,le=10000)
     package_max_bytes: int = Field(default=100*1024*1024,ge=1,le=1024**3)
     package_temp_root: str = './data/package-work'
+
+    @field_validator("ice_render_features")
+    @classmethod
+    def known_render_features(cls, values):
+        if set(values) - OPTIONAL_FEATURES:
+            raise ValueError("ICE render features must be supported by the installed compiler")
+        return sorted(set(values))
 
     @classmethod
     def from_env(cls):
@@ -68,6 +79,7 @@ class GatewaySettings(BaseModel):
                    ice_render_enabled=os.getenv("GATEWAY_ICE_RENDER_ENABLED", "false").lower() == "true",
                    ice_render_max_operations=int(os.getenv("GATEWAY_ICE_RENDER_MAX_OPERATIONS", "6")),
                    ice_render_max_duration_seconds=float(os.getenv("GATEWAY_ICE_RENDER_MAX_DURATION_SECONDS", "30")),
+                   ice_render_features=[value.strip() for value in os.getenv("GATEWAY_ICE_RENDER_FEATURES", "").split(",") if value.strip()],
                    analysis_enabled=os.getenv("GATEWAY_ANALYSIS_ENABLED", "false").lower() == "true",
                    analysis_fc_account_id=os.getenv("GATEWAY_ANALYSIS_FC_ACCOUNT_ID") or None,
                    analysis_fc_function_name=os.getenv("GATEWAY_ANALYSIS_FC_FUNCTION_NAME", "video-ai-shot-analysis"),
@@ -139,7 +151,7 @@ def _utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
-def create_app(settings: GatewaySettings | None = None, store=None, *, ice_client=None, shot_client=None) -> FastAPI:
+def create_app(settings: GatewaySettings | None = None, store=None, *, ice_client=None, shot_client=None, wan_settings=None, wan_client=None) -> FastAPI:
     settings = settings or GatewaySettings.from_env()
     if settings.database_url.startswith("sqlite:///./data/"):
         Path("data").mkdir(exist_ok=True)
@@ -274,4 +286,6 @@ def create_app(settings: GatewaySettings | None = None, store=None, *, ice_clien
     register_analysis_routes(app, settings=settings, sessions=sessions, store=store, authorize=authorize,
                              ice_client=ice_client, shot_client=shot_client)
     register_package_routes(app,settings=settings,sessions=sessions,store=store,authorize=authorize)
+    register_wan_routes(app, settings=wan_settings or WanSettings.from_env(), sessions=sessions,
+                        store=store, authorize=authorize, client=wan_client, ice_client=ice_client)
     return app

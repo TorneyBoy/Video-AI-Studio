@@ -1,0 +1,2 @@
+.ai-textarea{box-sizing:border-box;width:100%;min-height:200rpx}.ai-preview{width:100%;margin:24rpx 0}
+.ai-consent{display:flex;align-items:flex-start;gap:12rpx;color:#d4c6ef;line-height:1.7;margin:24rpx 0}

@@ -56,7 +56,7 @@ def advanced_features(timeline: dict) -> list[str]:
 
 def render_support(timeline: dict, *, provider: str | None = None, model_id: str | None = None, model_version: str | None = None) -> dict:
     required = advanced_features(timeline)
-    base = {"required_features": required, "selected": None, "missing_features": []}
+    base = {"required_features": required, "selected": None, "missing_features": [], "missing_combination": []}
     if not required:
         return {**base, "supported": True, "reason": "未使用额外媒体效果；渲染仍须通过服务、预算和质量检查。"}
     try:
@@ -66,10 +66,16 @@ def render_support(timeline: dict, *, provider: str | None = None, model_id: str
     choices = [item for item in entries if item.get("available") and item["capability"] == "video_editing"
                and (not provider or item["provider"] == provider) and (not model_id or item["model_id"] == model_id)
                and (not model_version or item["model_version"] == model_version)]
-    matches = [item for item in choices if set(required) <= set(item.get("limits", {}).get("features", []))]
+    covering = [item for item in choices if set(required) <= set(item.get("limits", {}).get("features", []))]
+    matches = [item for item in covering if len(required) == 1 or any(
+        set(required) <= set(combination) for combination in item.get("limits", {}).get("feature_combinations", [])
+        if isinstance(combination, list) and all(isinstance(feature, str) for feature in combination))]
     if matches:
         selected = sorted(matches, key=lambda item: item["id"])[0]
-        return {**base, "supported": True, "selected": selected, "reason": "已找到声明覆盖本版本全部效果的已验收服务；仍须通过额度与执行检查。"}
+        return {**base, "supported": True, "selected": selected, "reason": "已找到覆盖本版本效果组合的已验收服务；仍须通过额度与执行检查。"}
+    if covering:
+        return {**base, "supported": False, "missing_combination": required,
+                "reason": "当前服务的单项效果已开放，但此效果组合尚未验收。可保存编辑，生成前需完成组合媒体与费用验收。"}
     best = min(choices, key=lambda item: len(set(required) - set(item.get("limits", {}).get("features", [])))) if choices else None
     missing = sorted(set(required) - set((best or {}).get("limits", {}).get("features", [])))
     names = [LABELS.get(name, {"transition_fade": "淡化转场", "transition_dissolve": "溶解转场"}.get(name, name)) for name in missing]
@@ -81,10 +87,18 @@ def require_render_support(timeline: dict, *, require_price: bool = False, **pre
     support = render_support(timeline, **preferred)
     if not support["supported"]:
         raise EditingError("render_features_unavailable", support["reason"], 422,
-                           {"required_features": support["required_features"], "missing_features": support["missing_features"]})
+                           {"required_features": support["required_features"], "missing_features": support["missing_features"],
+                            "missing_combination": support["missing_combination"]})
     if support["selected"] is None and require_price:
         try:
-            return require_available_capability("video_editing", preferred.get("provider"), preferred.get("model_id"), preferred.get("model_version"))
+            support["selected"] = require_available_capability("video_editing", preferred.get("provider"), preferred.get("model_id"), preferred.get("model_version"))
         except ProviderExecutionError as exc:
             raise EditingError("quote_price_unavailable", "当前服务未提供已验收且带版本的报价，不能按零费用提交", 422) from exc
+    if support["selected"]:
+        from .media_quality import assert_renderer_quality
+        try:
+            assert_renderer_quality(timeline, renderer_model_id=support["selected"]["model_id"])
+        except ProviderExecutionError as exc:
+            raise EditingError(exc.code, "当前渲染方案尚未通过该画面的精确质量验收，请调整后重新报价", 422,
+                               exc.details) from exc
     return support["selected"]
